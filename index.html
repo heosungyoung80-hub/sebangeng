@@ -476,17 +476,20 @@
             html, body { width: 100%; min-width: 0; }
             body { height: 100dvh; min-height: 100dvh; max-width: 100vw; overflow: hidden; }
 
-            #global-nav { height: 56px; min-height: 56px; padding: 0 10px; gap: 8px; }
-            #global-nav .nav-left { gap: 8px; min-width: 0; flex-shrink: 1; }
+            #global-nav { width: 100vw; height: 56px; min-height: 56px; padding: 0 10px; gap: 8px; overflow: hidden; box-sizing: border-box; }
+            #global-nav .nav-left { display: none; }
             #global-nav .logo-text-stack { display: none; }
             #global-nav .tab-strip { flex: 1 1 auto; min-width: 0; max-width: none; align-self: stretch; align-items: center; gap: 4px; overflow-x: auto; overflow-y: hidden; scroll-snap-type: x proximity; -webkit-overflow-scrolling: touch; }
-            #global-nav .browser-tab { flex: 0 0 auto; scroll-snap-align: start; padding: 8px 10px; border-radius: 8px; font-size: 12px; transform: none; }
+            #global-nav .browser-tab { flex: 0 0 142px; scroll-snap-align: start; justify-content: center; padding: 8px 10px; border-radius: 8px; font-size: 12px; transform: none; box-sizing: border-box; }
             #global-nav .browser-tab.active { transform: none; }
             #global-nav .live-clock { display: none; }
             #breadcrumb-bar, #status-bar { padding-left: 12px; padding-right: 12px; overflow: hidden; white-space: nowrap; }
             #status-bar { display: none; }
 
-            .view-section, .view-section.active { width: 100% !important; min-width: 0; max-width: 100vw; flex: 1 1 auto; }
+            .view-section, .view-section.active { width: 100vw !important; min-width: 0; max-width: 100vw; flex: 1 1 auto; box-sizing: border-box; }
+            #view-dashboard.view-section.active, #view-input.view-section.active, #view-calendar.view-section.active,
+            #view-livedash.view-section.active, #view-analysis.view-section.active, #view-repair.view-section.active,
+            #view-daily.view-section.active, #view-stock.view-section.active { width: 100vw !important; max-width: 100vw !important; }
             #view-input, #view-dashboard, #view-daily { position: relative; }
             #view-input, #view-dashboard { overflow: hidden; }
             .mobile-sidebar-toggle {
