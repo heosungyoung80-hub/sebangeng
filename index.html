@@ -455,6 +455,75 @@
         }
     </style>
 
+    <style>
+        /* ============ 공통 모바일 반응형 / 좌측 메뉴 토글 ============ */
+        .mobile-sidebar-toggle { display: none; }
+
+        /* 화면이 넓어도 왼쪽 패널을 접을 수 있도록 항상 토글 버튼을 제공합니다. */
+        @media (min-width: 769px) {
+            #view-input, #view-dashboard, #view-daily { position: relative; }
+            #view-input .mobile-sidebar-toggle, #view-dashboard .mobile-sidebar-toggle, #view-daily .mobile-sidebar-toggle {
+                display: inline-flex; align-items: center; gap: 6px; position: absolute; top: 10px; left: 10px; z-index: 80;
+                min-height: 34px; padding: 7px 10px; border: 0; border-radius: 8px; background: #16232E; color: #fff;
+                font: inherit; font-size: 12px; font-weight: 700; cursor: pointer; box-shadow: 0 2px 8px rgba(0,0,0,.2);
+            }
+            #view-input.mobile-sidebar-collapsed #input-sidebar,
+            #view-dashboard.mobile-sidebar-collapsed #dash-sidebar,
+            #view-daily.mobile-sidebar-collapsed #daily-sidebar { display: none !important; }
+        }
+
+        @media (max-width: 768px) {
+            html, body { width: 100%; min-width: 0; }
+            body { height: 100dvh; min-height: 100dvh; overflow: hidden; }
+
+            #global-nav { height: 56px; min-height: 56px; padding: 0 10px; gap: 8px; }
+            #global-nav .nav-left { gap: 8px; min-width: 0; flex-shrink: 1; }
+            #global-nav .logo-text-stack { display: none; }
+            #global-nav .tab-strip { flex: 1; max-width: none; align-self: stretch; align-items: center; gap: 4px; }
+            #global-nav .browser-tab { padding: 8px 10px; border-radius: 8px; font-size: 12px; transform: none; }
+            #global-nav .browser-tab.active { transform: none; }
+            #global-nav .live-clock { display: none; }
+            #breadcrumb-bar, #status-bar { padding-left: 12px; padding-right: 12px; overflow: hidden; white-space: nowrap; }
+            #status-bar { display: none; }
+
+            .view-section { width: 100%; min-width: 0; }
+            #view-input, #view-dashboard, #view-daily { position: relative; }
+            #view-input, #view-dashboard { overflow: hidden; }
+            .mobile-sidebar-toggle {
+                display: inline-flex; align-items: center; gap: 6px; position: absolute; top: 10px; left: 10px;
+                z-index: 80; min-height: 36px; padding: 7px 10px; border: 0; border-radius: 8px;
+                background: #16232E; color: #fff; font: inherit; font-size: 12px; font-weight: 700; cursor: pointer;
+                box-shadow: 0 2px 8px rgba(0,0,0,.2);
+            }
+            #input-sidebar, #dash-sidebar, #daily-sidebar {
+                display: none !important; position: absolute; top: 54px; left: 8px; z-index: 70;
+                width: min(300px, calc(100vw - 16px)) !important; max-height: calc(100dvh - 130px);
+                padding: 10px !important; overflow-y: auto; background: #fff !important;
+                border: 1px solid #dbe3ea !important; border-radius: 12px; box-sizing: border-box;
+                box-shadow: 0 12px 28px rgba(15, 23, 42, .22); backdrop-filter: none;
+            }
+            #view-input.mobile-sidebar-open #input-sidebar,
+            #view-dashboard.mobile-sidebar-open #dash-sidebar,
+            #view-daily.mobile-sidebar-open #daily-sidebar { display: flex !important; }
+            #dash-sidebar { flex-direction: column; }
+            #input-main, #dash-main { width: 100%; min-width: 0; padding: 58px 12px 12px !important; box-sizing: border-box; }
+            #dash-main { overflow-y: auto; }
+            #view-daily > div:not(#daily-sidebar):not(.mobile-sidebar-toggle) { padding: 58px 12px 12px !important; }
+
+            .content-area { padding: 0; min-width: 0; }
+            #preview-bar { flex-wrap: wrap; gap: 10px; padding: 12px; }
+            #preview-bar .nav-btns { width: 100%; justify-content: flex-end; }
+            .grid.grid-cols-2, .selection-grid { grid-template-columns: 1fr !important; }
+            .chart-container { padding: 12px; min-width: 0; }
+            .section-title { font-size: 1rem; }
+            .date-picker-wrap { width: 100%; max-width: 100%; }
+            .sheet-preview-wrap, .overflow-x-auto { max-width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+            #view-repair { padding: 12px; box-sizing: border-box; overflow-y: auto; }
+            #repair-layout { height: auto !important; min-height: 100%; }
+            iframe { max-width: 100%; }
+        }
+    </style>
+
 <script>
     // ===== 세방고딕 2.0 Bold =====
     // 파일 용량을 아끼기 위해 폰트 데이터는 이곳에 한 번만 두고,
@@ -729,6 +798,7 @@
          VIEW: 장비 가동일보 (GitHub Pages: https://yesman-888.github.io/)
          ============================================================ -->
     <div id="view-daily" class="view-section" style="flex-direction:row; background:#EEF0F2;">
+        <button type="button" class="mobile-sidebar-toggle" aria-controls="daily-sidebar" aria-expanded="true" onclick="toggleMobileSidebar('daily')"><i class="fa-solid fa-bars"></i> 메뉴 숨기기</button>
         <div id="daily-sidebar">
             <div class="daily-nav-item active" id="daily-nav-write" onclick="switchDailyPanel('write')">1. 장비 가동일보 작성</div>
             <div class="daily-nav-item" id="daily-nav-status" onclick="switchDailyPanel('status')">2. 장비 가동일보 현황</div>
@@ -761,6 +831,7 @@
     </div>
 
     <div id="view-input" class="view-section">
+        <button type="button" class="mobile-sidebar-toggle" aria-controls="input-sidebar" aria-expanded="true" onclick="toggleMobileSidebar('input')"><i class="fa-solid fa-bars"></i> 메뉴 숨기기</button>
         <div id="input-sidebar">
             <div class="cal-nav-mirror">
                 <div class="cal-mirror-item" onclick="goToCalendarView('year')">1. 연간 일정</div>
@@ -924,6 +995,7 @@
     </div>
 
     <div id="view-dashboard" class="view-section relative">
+        <button type="button" class="mobile-sidebar-toggle" aria-controls="dash-sidebar" aria-expanded="true" onclick="toggleMobileSidebar('dashboard')"><i class="fa-solid fa-filter"></i> 필터 숨기기</button>
         <div id="loadingOverlay">
             <i class="fa-solid fa-circle-notch fa-spin text-5xl text-[#16232E] mb-4"></i>
             <h2 class="text-xl font-bold text-gray-800">구글 시트 연동 중...</h2>
@@ -1266,8 +1338,9 @@
             }
             if(viewName === 'calendar') {
                 if (!isCalendarLoaded) {
-                    document.getElementById('calendar-iframe').srcdoc = getCalendarHtmlWithOverrides();
-                    injectSebangFont(document.getElementById('calendar-iframe'));
+                document.getElementById('calendar-iframe').srcdoc = getCalendarHtmlWithOverrides();
+                injectSebangFont(document.getElementById('calendar-iframe'));
+                installMobileFrameLayout(document.getElementById('calendar-iframe'), 'calendar');
                     isCalendarLoaded = true;
                 } else {
                     // 캘린더는 한 번 열면 iframe이 그대로 살아 있고 자체 자동 새로고침 주기가 2시간이라,
@@ -1279,11 +1352,13 @@
             if(viewName === 'livedash' && !isLiveDashLoaded) {
                 document.getElementById('livedash-iframe').srcdoc = DASHBOARD_HTML_SRC;
                 injectSebangFont(document.getElementById('livedash-iframe'));
+                installMobileFrameLayout(document.getElementById('livedash-iframe'), 'dashboard');
                 isLiveDashLoaded = true;
             }
             if(viewName === 'analysis' && !isAnalysisLoaded) {
                 document.getElementById('analysis-iframe').srcdoc = TIMELINE_ANALYSIS_HTML_SRC;
                 injectSebangFont(document.getElementById('analysis-iframe'));
+                installMobileFrameLayout(document.getElementById('analysis-iframe'), 'analysis');
                 isAnalysisLoaded = true;
             }
             if(viewName === 'repair') {
@@ -5888,6 +5963,87 @@ ${completePhotoThumbsHtml(item)}
     }
     </script>
 <script>
+    // 모바일에서 각 화면의 좌측 메뉴를 필요할 때만 여닫습니다.
+    function toggleMobileSidebar(viewName) {
+        const view = document.getElementById(`view-${viewName}`);
+        const button = view && view.querySelector('.mobile-sidebar-toggle');
+        if (!view || !button) return;
+        const isMobile = window.matchMedia('(max-width: 768px)').matches;
+        const stateClass = isMobile ? 'mobile-sidebar-open' : 'mobile-sidebar-collapsed';
+        const isToggled = view.classList.toggle(stateClass);
+        const isVisible = isMobile ? isToggled : !isToggled;
+        button.setAttribute('aria-expanded', String(isVisible));
+        const label = viewName === 'dashboard' ? '필터' : '메뉴';
+        const icon = viewName === 'dashboard' ? 'fa-filter' : 'fa-bars';
+        button.innerHTML = `<i class="fa-solid ${icon}"></i> ${isVisible ? `${label} 숨기기` : `${label} 보이기`}`;
+    }
+
+    function closeMobileSidebars() {
+        document.querySelectorAll('.mobile-sidebar-open').forEach(view => {
+            view.classList.remove('mobile-sidebar-open');
+            const button = view.querySelector('.mobile-sidebar-toggle');
+            if (button) button.setAttribute('aria-expanded', 'false');
+        });
+    }
+
+    document.addEventListener('click', event => {
+        if (!window.matchMedia('(max-width: 768px)').matches) return;
+        const sidebar = event.target.closest('#input-sidebar, #dash-sidebar, #daily-sidebar');
+        if (sidebar && !event.target.closest('.mobile-sidebar-toggle')) closeMobileSidebars();
+    });
+    document.addEventListener('keydown', event => { if (event.key === 'Escape') closeMobileSidebars(); });
+    window.addEventListener('resize', () => { if (!window.matchMedia('(max-width: 768px)').matches) closeMobileSidebars(); });
+
+    // srcdoc으로 포함되는 캘린더·현황판·분석 화면에도 모바일 폭과 레이아웃을 적용합니다.
+    function installMobileFrameLayout(frame, type) {
+        if (!frame || frame.dataset.mobileLayoutInstalled) return;
+        frame.dataset.mobileLayoutInstalled = 'true';
+        frame.addEventListener('load', () => {
+            try {
+                const doc = frame.contentDocument;
+                if (!doc || doc.getElementById('mobile-frame-layout')) return;
+                const style = doc.createElement('style');
+                style.id = 'mobile-frame-layout';
+                style.textContent = `
+                    @media (max-width: 768px) {
+                        html, body { width:100%; min-width:0; overflow-x:hidden !important; }
+                        .app-body { flex-direction:column !important; height:auto !important; min-height:100dvh; }
+                        .main-area, .content-wrapper { width:100% !important; min-width:0; box-sizing:border-box; }
+                        .main-area { padding:12px !important; }
+                        .side-nav { display:none !important; width:100% !important; max-height:55dvh; overflow:auto; }
+                        body.mobile-inner-menu-open .side-nav { display:flex !important; }
+                        .header-container { flex-wrap:wrap; gap:8px; }
+                        .calendar, #month-calendar-container { min-width:620px; }
+                        .content-wrapper { overflow-x:auto; -webkit-overflow-scrolling:touch; }
+                        .modal { width:calc(100vw - 24px) !important; max-height:90dvh; overflow:auto; box-sizing:border-box; }
+                        .wrapper { height:auto !important; min-height:100dvh; overflow:auto !important; }
+                        .dashboard-grid { grid-template-columns:1fr !important; height:auto !important; }
+                        .left-col, .right-col { min-height:0; }
+                        .panel { min-height:300px; }
+                        .app-layout { min-width:0; }
+                    }
+                `;
+                doc.head.appendChild(style);
+                if (type === 'calendar' && !doc.getElementById('mobile-inner-menu-toggle')) {
+                    const button = doc.createElement('button');
+                    button.id = 'mobile-inner-menu-toggle';
+                    button.type = 'button';
+                    button.textContent = '☰ 메뉴';
+                    button.setAttribute('aria-expanded', 'false');
+                    button.style.cssText = 'display:none;position:fixed;top:10px;left:10px;z-index:3000;padding:8px 10px;border:0;border-radius:8px;background:#16232E;color:#fff;font-weight:700;';
+                    const toggleStyle = doc.createElement('style');
+                    toggleStyle.textContent = '@media (max-width:768px){#mobile-inner-menu-toggle{display:block !important}.app-body{padding-top:48px;box-sizing:border-box}}';
+                    doc.head.appendChild(toggleStyle);
+                    button.addEventListener('click', () => {
+                        const open = doc.body.classList.toggle('mobile-inner-menu-open');
+                        button.setAttribute('aria-expanded', String(open));
+                    });
+                    doc.body.appendChild(button);
+                }
+            } catch (e) { /* 외부 도메인 iframe은 브라우저 보안상 수정하지 않습니다. */ }
+        }, { once: true });
+    }
+
     // 메인(홈) 화면 하단 시계
     (function () {
         function tickHomeClock() {
