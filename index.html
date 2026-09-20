@@ -382,6 +382,9 @@
         .master-item-row { display: flex; justify-content: space-between; align-items: center; padding: 7px 12px; border: 1px solid #e2e8f0; border-radius: 6px; font-size: 13px; color: #334155; }
         .master-item-row button { color: #ef4444; background: none; border: none; cursor: pointer; font-size: 13px; padding: 2px 4px; }
         .master-item-row button:hover { color: #b91c1c; }
+        .master-item-row button.btn-edit { color: #2C93A0; }
+        .master-item-row button.btn-edit:hover { color: #16232E; }
+        .master-item-row .row-actions { display: flex; align-items: center; gap: 2px; flex-shrink: 0; }
 
         @media print {
             @page { margin: 10mm; }
@@ -585,7 +588,7 @@
             <div id="settings-detail-masterdata" class="hidden">
                 <button onclick="backToSettingsMenu()" class="text-xs text-gray-500 font-bold mb-3"><i class="fa-solid fa-arrow-left mr-1"></i>목록으로</button>
                 <h3 class="text-lg font-bold text-[#16232E] mb-1"><i class="fa-solid fa-database mr-2"></i>기준정보 관리</h3>
-                <p class="text-xs text-gray-500 mb-2">장비 구분·장비번호·거래처·정비 구분·불량 유형을 추가하거나 삭제할 수 있습니다. 장비·거래처는 구글시트에 저장되어 모든 기기에서 공유됩니다.</p>
+                <p class="text-xs text-gray-500 mb-2">장비 구분·장비번호·거래처·정비 구분·불량 유형·세부 원인을 추가·수정·삭제할 수 있습니다. 장비·거래처는 구글시트에 저장되어 모든 기기에서 공유됩니다.</p>
                 <div id="master-data-status" class="hidden text-xs text-[#16232E] font-bold mb-3"><i class="fa-solid fa-spinner fa-spin mr-1"></i><span id="master-data-status-text">저장 중...</span></div>
 
                 <div class="flex gap-1 mb-4 border-b border-gray-200" style="flex-wrap:wrap;">
@@ -594,6 +597,7 @@
                     <button class="master-tab-btn" data-tab="vendor" onclick="switchMasterTab('vendor')">거래처</button>
                     <button class="master-tab-btn" data-tab="maintcat" onclick="switchMasterTab('maintcat')">정비 구분</button>
                     <button class="master-tab-btn" data-tab="defecttype" onclick="switchMasterTab('defecttype')">불량 유형</button>
+                    <button class="master-tab-btn" data-tab="causetype" onclick="switchMasterTab('causetype')">세부 원인</button>
                 </div>
 
                 <div id="master-tab-equiptype" class="master-tab-panel">
@@ -639,6 +643,20 @@
                         <button onclick="addDefectTypeItem()" class="px-4 py-2 bg-[#16232E] text-white rounded text-sm font-bold">추가</button>
                     </div>
                     <div id="defect-type-list" class="space-y-1 max-h-64 overflow-y-auto"></div>
+                </div>
+
+                <div id="master-tab-causetype" class="master-tab-panel hidden">
+                    <p class="text-xs text-gray-500 mb-2">정비 구분과 불량 유형을 차례로 고르면, 그 아래에 딸려 나오는 <b>세부 원인</b> 목록을 정리할 수 있습니다.</p>
+                    <div class="flex gap-2 mb-3">
+                        <select id="cause-cat-select" onchange="renderCauseDefectSelect()" class="flex-1 border border-gray-300 rounded px-3 py-2 text-sm"></select>
+                        <select id="cause-defect-select" onchange="renderCauseTypeManageList()" class="flex-1 border border-gray-300 rounded px-3 py-2 text-sm"></select>
+                    </div>
+                    <div class="flex gap-2 mb-2">
+                        <input type="text" id="new-cause-type-input" placeholder="새 세부 원인 (예: 베어링 마모)" class="flex-1 border border-gray-300 rounded px-3 py-2 text-sm" onkeypress="if(event.key==='Enter'){addCauseTypeItem();}">
+                        <button onclick="addCauseTypeItem()" class="px-4 py-2 bg-[#16232E] text-white rounded text-sm font-bold">추가</button>
+                    </div>
+                    <div id="cause-type-note" class="text-[11px] text-gray-400 mb-2"></div>
+                    <div id="cause-type-list" class="space-y-1 max-h-64 overflow-y-auto"></div>
                 </div>
 
                 <div class="flex justify-end gap-2 mt-5">
@@ -1473,23 +1491,205 @@
             "필터":     ["막힘", "오염", "파손", "누유", "성능저하", "교환주기", "기타"]
         };
 
+        // 💡 수리 요청 접수 - "불량 유형" 선택에 따라 종속적으로 나타나는 "세부 원인" 옵션 목록
+        //    (정비 구분 → 불량 유형 → 세부 원인 3단 구조. 설정 > 기준정보 관리 > "세부 원인" 탭에서 수정 가능)
+        const DEFAULT_CAUSE_TYPE_MAP = {
+            "필터": {
+                "막힘": ["분진 과다 유입(벌크화물 작업)", "교환주기 초과 사용", "이물질 퇴적", "흡입구 차폐 불량", "역세척·청소 미실시"],
+                "오염": ["유증기 혼입", "수분 응축", "연료·작동유 내 이물질", "보관 중 포장 손상"],
+                "파손": ["여과지 찢어짐", "케이스 균열", "조립 불량(과체결)", "차압 과다에 의한 변형"],
+                "누유": ["오링·가스켓 경화", "체결 토크 부족", "나사산 손상", "필터 헤드 균열"],
+                "성능저하": ["규격 외 필터 사용", "사용시간 초과", "여과효율 저하", "바이패스 밸브 열림"],
+                "교환주기": ["정기 교환주기 도래", "가동시간 기준 도달", "계절 점검 항목", "제작사 권장주기 도달"],
+                "기타": ["원인 미상", "타 부품 정비 중 동시 교환", "예방정비"]
+            },
+            "전장부품": {
+                "전원불량": ["배터리 전압 저하", "퓨즈 단선", "릴레이 불량", "접지 불량", "발전기 충전 불량"],
+                "단선": ["배선 피복 손상", "진동에 의한 반복 굽힘", "커넥터 단자 이탈", "간섭·쓸림에 의한 절단", "설치류(쥐) 피해"],
+                "접촉불량": ["단자 부식", "커넥터 체결 헐거움", "수분 침투", "접점 산화", "진동에 의한 풀림"],
+                "합선": ["피복 손상 후 차체 접촉", "수분 침투", "배선 정리 불량", "임의 개조 배선"],
+                "센서불량": ["센서부 오염·이물질", "센서 수명 도래", "배선 커넥터 불량", "충격에 의한 파손", "규격 외 부품 사용"],
+                "스위치불량": ["접점 마모", "이물질 유입", "방수 불량", "과전류에 의한 소손", "사용 빈도 과다"],
+                "통신불량": ["CAN 배선 손상", "종단저항 이상", "컨트롤러 불량", "노이즈 간섭", "커넥터 접촉불량"],
+                "오류발생": ["컨트롤러 소프트웨어 오류", "센서 입력값 이상", "전압 불안정", "설정값 오류"],
+                "기타": ["원인 미상", "노후화에 따른 예방 교체", "타 정비 중 동시 교체"]
+            },
+            "오일": {
+                "누유": ["오일씰 경화·마모", "개스킷 손상", "호스 균열", "체결부 풀림", "케이스 균열"],
+                "부족": ["누유로 인한 감소", "보충 누락", "소모량 과다", "점검주기 미준수"],
+                "오염": ["금속분 혼입", "분진 유입", "이종 오일 혼합", "열화(변색·산화)", "냉각수 혼입"],
+                "수분혼입": ["결로 발생", "세차·우수 침투", "오일쿨러 내부 누수", "보관 불량"],
+                "과다": ["과다 주입", "이종 유체 유입", "열팽창에 의한 레벨 상승"],
+                "압력저하": ["오일펌프 마모", "릴리프밸브 불량", "흡입 스트레이너 막힘", "점도 저하", "베어링 간극 과다"],
+                "교환주기": ["정기 교환주기 도래", "가동시간 기준 도달", "오일분석 결과 교환 판정"],
+                "기타": ["원인 미상", "예방정비"]
+            },
+            "유압부품": {
+                "누유": ["실린더 로드씰 마모", "호스·피팅 균열", "오링 경화", "체결부 풀림", "로드 표면 손상(스크래치)"],
+                "압력저하": ["릴리프밸브 설정 이탈", "펌프 내부 마모", "밸브 스풀 고착", "내부 누설 과다", "어큐뮬레이터 질소압 저하"],
+                "작동불량": ["솔레노이드 밸브 불량", "이물질에 의한 스풀 고착", "파일럿 압력 부족", "제어 배선·신호 이상"],
+                "작동지연": ["저온에 의한 작동유 점도 상승", "유량 부족", "스트레이너 막힘", "밸브 응답 지연"],
+                "소음": ["공기 혼입(캐비테이션)", "흡입라인 막힘", "펌프 베어링 마모", "유량 과다"],
+                "진동": ["배관 고정 브라켓 풀림", "맥동 과다", "어큐뮬레이터 불량", "펌프 불균형"],
+                "과열": ["오일쿨러 막힘", "작동유 부족", "내부 누설 과다", "릴리프 지속 작동", "고부하 연속작업"],
+                "파손": ["호스 파열", "실린더 로드 휨", "피팅 파단", "과압·충격 하중"],
+                "기타": ["원인 미상", "예방정비"]
+            },
+            "소모품": {
+                "부족": ["재고 소진", "불출 누락", "사용량 증가"],
+                "오염": ["보관 중 분진 유입", "수분 침투", "포장 손상"],
+                "마모": ["사용시간 경과", "마찰 과다", "규격 미달품 사용"],
+                "파손": ["취급 부주의", "충격", "과부하", "노후 경화"],
+                "성능저하": ["유효기간 경과", "규격 외 대체품 사용", "가혹한 사용환경"],
+                "교환주기": ["정기 교환주기 도래", "점검표 지정 주기 도달"],
+                "기타": ["원인 미상", "예방 교체"]
+            },
+            "타이어": {
+                "마모": ["주행거리 누적", "공기압 관리 미흡", "급제동·급출발", "노면 상태 불량"],
+                "펑크": ["못·철편 관통", "벌크화물 잔재물 밟음", "비드부 손상", "밸브 불량"],
+                "파손": ["사이드월 손상", "연석·구조물 충돌", "과적 운행", "코드 절단"],
+                "공기압부족": ["자연 감압", "밸브코어 누설", "림 실링 불량", "점검주기 미준수"],
+                "편마모": ["얼라인먼트 불량", "허브 베어링 유격", "좌우 공기압 편차", "편하중 작업"],
+                "트레드손상": ["노면 이물질", "스키드 발생", "과속 선회", "고무 노화(크랙)"],
+                "위치이상": ["위치교환(로테이션) 미실시", "좌우 규격 불일치", "장착 불량"],
+                "기타": ["원인 미상", "권장 교체주기 도래"]
+            },
+            "어터치먼트": {
+                "파손": ["과부하 사용", "충격 하중", "용접부 파단", "노후화"],
+                "균열": ["반복 하중에 의한 피로", "용접부 결함", "저온 취성", "응력 집중부 발생"],
+                "변형": ["과적·편하중", "충돌", "무리한 비틀림 작업"],
+                "마모": ["접촉부 마찰", "윤활 부족", "연마성 화물 취급", "사용시간 경과"],
+                "유격": ["핀·부시 마모", "고정볼트 풀림", "윤활 불량", "베어링 마모"],
+                "누유": ["실린더 씰 마모", "호스 손상", "로터리 조인트 불량", "체결부 풀림"],
+                "작동불량": ["유압 계통 이상", "센서·리미트 스위치 불량", "잠금장치 고착", "이물질 끼임"],
+                "기타": ["원인 미상", "예방정비"]
+            },
+            "샤시": {
+                "균열": ["피로 하중 누적", "용접부 결함", "과적 운행", "노면 충격 반복"],
+                "파손": ["충돌·접촉 사고", "과적 운행", "부품 노후화"],
+                "변형": ["과적 운행", "편하중 적재", "충돌", "부적절한 잭업 지점 사용"],
+                "부식": ["해풍(염분) 노출", "도장 손상", "습기 체류", "하부 세척 미흡"],
+                "풀림": ["체결 토크 부족", "진동에 의한 풀림", "와셔 미체결", "정비 후 재체결 누락"],
+                "마모": ["서스펜션 부싱 마모", "핀 마모", "윤활 부족"],
+                "유격": ["부싱·핀 마모", "볼트 풀림", "베어링 마모"],
+                "누유": ["허브 오일씰 마모", "브레이크 계통 누유", "에어 계통 누설"],
+                "기타": ["원인 미상", "정기점검 지적사항"]
+            },
+            "요소수": {
+                "부족": ["보충 누락", "소모량 증가", "장시간 연속 운행"],
+                "누수": ["탱크 균열", "호스·피팅 손상", "펌프 모듈 누설", "동결에 의한 손상"],
+                "공급불량": ["인젝터 결정화 막힘", "공급 펌프 불량", "요소수 필터 막힘", "저온에 의한 라인 동결"],
+                "센서불량": ["레벨센서 불량", "NOx 센서 불량", "온도센서 불량", "배선 접촉불량"],
+                "품질이상": ["규격 미달 요소수 주입", "이물질 혼입", "희석·변질", "장기 보관에 의한 열화"],
+                "경고발생": ["잔량 경고", "품질 경고", "시스템 점검 경고", "출력제한 경고"],
+                "시스템오류": ["SCR 제어기 오류", "소프트웨어 이상", "통신 불량", "재생 실패"],
+                "기타": ["원인 미상", "예방정비"]
+            },
+            "브러쉬": {
+                "마모": ["사용시간 경과", "노면 마찰 과다", "압착력 과다 설정"],
+                "파손": ["이물질 끼임", "충격", "노후 경화"],
+                "변형": ["편마모 진행", "보관 중 눌림", "열 변형"],
+                "탈락": ["고정볼트 풀림", "체결·접착부 노후", "회전 불균형"],
+                "작동불량": ["구동 계통 이상", "유압·전기 공급 불량", "회전부 고착"],
+                "모터불량": ["카본 브러시 마모", "베어링 손상", "과부하 소손", "배선 불량"],
+                "기타": ["원인 미상", "예방 교체"]
+            },
+            "벨트": {
+                "단선": ["수명 도래", "장력 과다", "풀리 정렬 불량", "이물질 유입"],
+                "균열": ["고무 경화(노화)", "고온 노출", "굴곡 피로", "오일 오염"],
+                "마모": ["풀리 마모", "정렬 불량", "장력 부족", "이물질 유입"],
+                "장력불량": ["텐셔너 불량", "조정 미흡", "벨트 신장", "스프링 피로"],
+                "미끄럼": ["오일·수분 부착", "장력 부족", "풀리 홈 마모", "과부하"],
+                "소음": ["정렬 불량", "장력 이상", "베어링 마모", "벨트 경화"],
+                "이탈": ["풀리 정렬 불량", "텐셔너 불량", "이물질 끼임", "베어링 유격"]
+            },
+            "와이어": {
+                "단선": ["수명 도래", "과부하 사용", "충격 하중", "소선절단 누적"],
+                "마모": ["시브(활차) 홈 마모", "윤활 부족", "드럼 난권", "구조물 간섭"],
+                "소선절단": ["피로 누적", "폐기기준 도달", "급격한 하중 변동", "시브 직경 부적합"],
+                "부식": ["해풍(염분) 노출", "윤활유 도포 미흡", "습기 체류"],
+                "꼬임": ["킹크 발생", "권취 불량", "무부하 상태 풀림", "회전방지장치 불량"],
+                "장력불량": ["밸런스 불량", "드럼 권취 불균일", "텐션 장치 이상"],
+                "이탈": ["시브 이탈", "가이드 불량", "급정지", "무부하 하강"],
+                "기타": ["원인 미상", "정기검사 지적사항"]
+            },
+            "배터리": {
+                "방전": ["장기 미사용", "암전류 과다", "등화류 소등 누락", "저온 환경"],
+                "충전불량": ["발전기(알터네이터) 불량", "레귤레이터 이상", "벨트 미끄럼", "충전 배선 불량"],
+                "전압이상": ["셀 불량", "과충전", "과방전 반복", "셀 간 전압 편차"],
+                "단자불량": ["단자 부식(백화)", "체결 풀림", "케이블 단자 손상"],
+                "누액": ["케이스 균열", "과충전에 의한 전해액 비등", "충격 손상", "캡 불량"],
+                "수명저하": ["사용연한 경과", "충방전 횟수 과다", "보충수 관리 불량", "고온 환경"],
+                "기타": ["원인 미상", "예방 교체"]
+            },
+            "정기검사": {
+                "검사주기": ["검사 유효기간 만료 도래", "연간 검사계획 반영"],
+                "검사불합격": ["제동력 부족", "누유·누수 지적", "안전장치 불량", "구조변경 미신고"],
+                "법정검사": ["건설기계 정기검사", "자동차 정기검사", "압력용기·승강설비 검사"],
+                "성능검사": ["하중시험 기준 미달", "권상·주행 성능 이상", "계측값 기준 미달"],
+                "안전검사": ["안전장치 작동 불량", "방호장치 미설치", "경보장치 이상"],
+                "재검사": ["불합격 항목 보완 후 재검사", "기한 내 재검사 미실시"]
+            },
+            "부동액": {
+                "누수": ["라디에이터 코어 누수", "호스 균열", "워터펌프 씰 불량", "클램프 풀림", "헤드가스켓 손상"],
+                "부족": ["누수로 인한 감소", "보충 누락", "리저브탱크 점검 미흡"],
+                "과열": ["라디에이터 막힘", "냉각팬 작동 불량", "서모스탯 고착", "냉각수 농도 부적정"],
+                "순환불량": ["워터펌프 불량", "서모스탯 고착", "스케일·슬러지 퇴적", "공기 혼입(에어)"],
+                "오염": ["엔진오일 혼입", "스케일 발생", "이종 부동액 혼합", "장기 미교환"],
+                "기타": ["원인 미상", "동절기 농도 점검", "예방 교체"]
+            },
+            "시스템": {
+                "작동불량": ["제어기 불량", "입력 신호 이상", "액추에이터 불량", "전원 공급 이상"],
+                "오류발생": ["소프트웨어 오류", "메모리 오류", "센서값 범위 초과", "펌웨어 버전 불일치"],
+                "경고발생": ["센서 경고 출력", "한계값 초과", "자가진단 결과 이상", "소모품 교체 알림"],
+                "통신불량": ["네트워크 배선 단선", "노이즈 간섭", "종단저항 이상", "통신 모듈 불량"],
+                "성능저하": ["연산 지연", "장비 노후화", "데이터 누적", "온도·습도 환경 영향"],
+                "설정이상": ["파라미터 임의 변경", "설정값 오입력", "업데이트 후 설정 유실"],
+                "기타": ["원인 미상", "예방 점검"]
+            },
+            "엔진": {
+                "시동불량": ["배터리 방전", "스타터 모터 불량", "연료 공급 불량", "예열플러그 불량", "크랭크각 센서 이상"],
+                "출력저하": ["연료필터 막힘", "터보차저 불량", "인젝터 불량", "흡기 막힘", "배기 후처리 장치 막힘"],
+                "과열": ["냉각수 부족", "라디에이터 막힘", "냉각팬·벨트 불량", "서모스탯 고착", "과부하 연속운전"],
+                "이상소음": ["밸브 간극 이상", "베어링 마모", "벨트·텐셔너 이상", "배기 누설", "노킹 발생"],
+                "매연과다": ["인젝터 분사 불량", "에어클리너 막힘", "터보차저 불량", "연료 품질 불량", "DPF 포집 과다"],
+                "누유": ["오일씰 경화", "로커커버 개스킷 손상", "오일팬 볼트 풀림", "오일쿨러 누유", "터보 리턴라인 불량"],
+                "냉각수누수": ["호스 균열", "워터펌프 누수", "라디에이터 손상", "헤드가스켓 손상"],
+                "떨림": ["실린더 부조", "엔진 마운트 노후", "인젝터 분사량 편차", "연료 공급 불안정"],
+                "경고등점등": ["엔진오일압 경고", "냉각수온 경고", "배기 후처리 경고", "센서 이상", "제어기 고장코드 발생"],
+                "기타": ["원인 미상", "예방정비"]
+            },
+            "기타": {
+                "이상소음": ["베어링 마모", "체결부 풀림", "윤활 부족", "이물질 접촉"],
+                "진동": ["회전체 불균형", "마운트 노후", "볼트 풀림", "정렬 불량"],
+                "파손": ["충격·충돌", "과부하", "노후화", "취급 부주의"],
+                "균열": ["피로 하중", "용접부 결함", "응력 집중", "부식 진행"],
+                "변형": ["과적·편하중", "충돌", "열 영향"],
+                "작동불량": ["구동부 고착", "전기·유압 공급 이상", "제어 불량", "이물질 끼임"],
+                "기타": ["원인 미상", "예방정비", "사용자 요청"]
+            }
+        };
+
         // 💡 실제 화면에서 쓰는 목록 (설정 > 기준정보 관리 > "정비 구분" / "불량 유형" 탭에서 추가·삭제 가능)
         //    - 기준정보 시트가 maintCategories / defectTypes 를 내려주면 그 값을 우선 사용하고,
         //    - 시트에 아직 없으면 이 브라우저(localStorage)에 저장해 둔 값을 사용합니다.
         let MAINT_PART_CATEGORY_LIST = DEFAULT_MAINT_PART_CATEGORY_LIST.slice();
         let DEFECT_TYPE_MAP = JSON.parse(JSON.stringify(DEFAULT_DEFECT_TYPE_MAP));
+        let CAUSE_TYPE_MAP = JSON.parse(JSON.stringify(DEFAULT_CAUSE_TYPE_MAP));
         const MAINT_CATEGORY_STORAGE_KEY = 'sebang_maint_category_override';
         let isMaintCategoryFromSheet = false;
 
         function loadMaintCategoryOverride() {
             MAINT_PART_CATEGORY_LIST = DEFAULT_MAINT_PART_CATEGORY_LIST.slice();
             DEFECT_TYPE_MAP = JSON.parse(JSON.stringify(DEFAULT_DEFECT_TYPE_MAP));
+            CAUSE_TYPE_MAP = JSON.parse(JSON.stringify(DEFAULT_CAUSE_TYPE_MAP));
             try {
                 const raw = localStorage.getItem(MAINT_CATEGORY_STORAGE_KEY);
                 if (!raw) return;
                 const saved = JSON.parse(raw);
                 if (saved && Array.isArray(saved.categories) && saved.categories.length) MAINT_PART_CATEGORY_LIST = saved.categories.slice();
                 if (saved && saved.defects && typeof saved.defects === 'object') DEFECT_TYPE_MAP = saved.defects;
+                if (saved && saved.causes && typeof saved.causes === 'object') CAUSE_TYPE_MAP = saved.causes;
             } catch (e) { console.warn('저장해 둔 정비 구분 목록을 읽지 못했습니다:', e); }
         }
 
@@ -1497,7 +1697,8 @@
             try {
                 localStorage.setItem(MAINT_CATEGORY_STORAGE_KEY, JSON.stringify({
                     categories: MAINT_PART_CATEGORY_LIST,
-                    defects: DEFECT_TYPE_MAP
+                    defects: DEFECT_TYPE_MAP,
+                    causes: CAUSE_TYPE_MAP
                 }));
                 return true;
             } catch (e) {
@@ -1549,6 +1750,7 @@
                 if (Array.isArray(data.maintCategories) && data.maintCategories.length) {
                     MAINT_PART_CATEGORY_LIST = data.maintCategories;
                     if (data.defectTypes && typeof data.defectTypes === 'object') DEFECT_TYPE_MAP = data.defectTypes;
+                    if (data.causeTypes && typeof data.causeTypes === 'object') CAUSE_TYPE_MAP = data.causeTypes;
                     isMaintCategoryFromSheet = true;
                 } else {
                     isMaintCategoryFromSheet = false;
@@ -1581,6 +1783,7 @@
             if (tab === 'equipnum') renderEquipNumTypeSelect();
             if (tab === 'maintcat') renderMaintCatManageList();
             if (tab === 'defecttype') renderDefectCatSelect();
+            if (tab === 'causetype') renderCauseCatSelect();
         }
 
         // 시트에서 다시 불러온 뒤, 이를 참조하는 화면들을 함께 새로고침
@@ -1602,6 +1805,7 @@
             renderVendorManageList();
             renderMaintCatManageList();
             renderDefectCatSelect();
+            renderCauseCatSelect();
             refreshPartCategoryViews();
             setMasterDataBusy(false);
         }
@@ -1771,6 +1975,28 @@
         // 정비 구분(부품 대분류) / 불량 유형 관리
         // ==========================================
 
+        // 특정 "정비 구분 + 불량 유형"에 딸린 세부 원인 목록을 돌려줌 (없으면 빈 배열)
+        function getCauseList(cat, defect) {
+            if (!cat || !defect) return [];
+            const byCat = CAUSE_TYPE_MAP[cat];
+            if (!byCat || typeof byCat !== 'object') return [];
+            return Array.isArray(byCat[defect]) ? byCat[defect] : [];
+        }
+
+        // 세부 원인 목록을 안전하게 넣기 위한 도우미 (중간 객체가 없으면 만들어 줌)
+        function ensureCauseSlot(cat, defect) {
+            if (!CAUSE_TYPE_MAP[cat] || typeof CAUSE_TYPE_MAP[cat] !== 'object') CAUSE_TYPE_MAP[cat] = {};
+            if (!Array.isArray(CAUSE_TYPE_MAP[cat][defect])) CAUSE_TYPE_MAP[cat][defect] = [];
+            return CAUSE_TYPE_MAP[cat][defect];
+        }
+
+        // 한 정비 구분에 달린 세부 원인 총 개수 (기준정보 화면 표시용)
+        function countCausesOfCategory(cat) {
+            const byCat = CAUSE_TYPE_MAP[cat];
+            if (!byCat || typeof byCat !== 'object') return 0;
+            return Object.keys(byCat).reduce((sum, d) => sum + (Array.isArray(byCat[d]) ? byCat[d].length : 0), 0);
+        }
+
         // 정비 구분 목록이 바뀌면 이 목록을 쓰는 화면들을 모두 다시 그려줌
         function refreshPartCategoryViews() {
             try { renderPartCategoryOptions(); } catch (e) {}
@@ -1812,8 +2038,11 @@
 
             el.innerHTML = MAINT_PART_CATEGORY_LIST.map(c => `
                 <div class="master-item-row">
-                    <span>${escapeHtml(c)} <span style="color:#94a3b8; font-size:11px;">(불량 유형 ${(DEFECT_TYPE_MAP[c] || []).length}개)</span></span>
-                    <button onclick="deleteMaintCategory('${escapeAttr(c)}')" title="삭제"><i class="fa-solid fa-xmark"></i></button>
+                    <span>${escapeHtml(c)} <span style="color:#94a3b8; font-size:11px;">(불량 유형 ${(DEFECT_TYPE_MAP[c] || []).length}개 · 세부 원인 ${countCausesOfCategory(c)}개)</span></span>
+                    <span class="row-actions">
+                        <button class="btn-edit" onclick="renameMaintCategory('${escapeAttr(c)}')" title="이름 수정"><i class="fa-solid fa-pen"></i></button>
+                        <button onclick="deleteMaintCategory('${escapeAttr(c)}')" title="삭제"><i class="fa-solid fa-xmark"></i></button>
+                    </span>
                 </div>`).join('') || '<div class="text-xs text-gray-400 text-center py-4">등록된 정비 구분이 없습니다.</div>';
         }
 
@@ -1834,9 +2063,15 @@
                     if (etcIdx > -1) MAINT_PART_CATEGORY_LIST.splice(etcIdx, 0, name);
                     else MAINT_PART_CATEGORY_LIST.push(name);
                     if (!DEFECT_TYPE_MAP[name]) DEFECT_TYPE_MAP[name] = ['작동불량', '파손', '누유', '이상소음', '기타'];
+                    // 새 정비 구분의 불량 유형마다 세부 원인 자리를 미리 만들어 둠 (기본값 "원인 미상")
+                    if (!CAUSE_TYPE_MAP[name]) {
+                        CAUSE_TYPE_MAP[name] = {};
+                        DEFECT_TYPE_MAP[name].forEach(d => { CAUSE_TYPE_MAP[name][d] = ['원인 미상']; });
+                    }
                     saveMaintCategoryOverride();
                     renderMaintCatManageList();
                     renderDefectCatSelect();
+                    renderCauseCatSelect();
                     refreshPartCategoryViews();
                     setMasterDataBusy(false);
                 }
@@ -1860,10 +2095,12 @@
                 } else {
                     MAINT_PART_CATEGORY_LIST = MAINT_PART_CATEGORY_LIST.filter(c => c !== name);
                     delete DEFECT_TYPE_MAP[name];
+                    delete CAUSE_TYPE_MAP[name];
                     if (fd.partCategory === name) { fd.partCategory = ''; fd.defectType = ''; }
                     saveMaintCategoryOverride();
                     renderMaintCatManageList();
                     renderDefectCatSelect();
+                    renderCauseCatSelect();
                     refreshPartCategoryViews();
                     setMasterDataBusy(false);
                 }
@@ -1893,8 +2130,11 @@
             const list = DEFECT_TYPE_MAP[cat] || [];
             el.innerHTML = list.map(d => `
                 <div class="master-item-row">
-                    <span>${escapeHtml(d)}</span>
-                    <button onclick="deleteDefectTypeItem('${escapeAttr(cat)}', '${escapeAttr(d)}')" title="삭제"><i class="fa-solid fa-xmark"></i></button>
+                    <span>${escapeHtml(d)} <span style="color:#94a3b8; font-size:11px;">(세부 원인 ${getCauseList(cat, d).length}개)</span></span>
+                    <span class="row-actions">
+                        <button class="btn-edit" onclick="renameDefectTypeItem('${escapeAttr(cat)}', '${escapeAttr(d)}')" title="이름 수정"><i class="fa-solid fa-pen"></i></button>
+                        <button onclick="deleteDefectTypeItem('${escapeAttr(cat)}', '${escapeAttr(d)}')" title="삭제"><i class="fa-solid fa-xmark"></i></button>
+                    </span>
                 </div>`).join('') || '<div class="text-xs text-gray-400 text-center py-4">등록된 불량 유형이 없습니다.</div>';
         }
 
@@ -1916,9 +2156,12 @@
                 } else {
                     if (!DEFECT_TYPE_MAP[cat]) DEFECT_TYPE_MAP[cat] = [];
                     DEFECT_TYPE_MAP[cat].push(name);
+                    ensureCauseSlot(cat, name);
+                    if (CAUSE_TYPE_MAP[cat][name].length === 0) CAUSE_TYPE_MAP[cat][name] = ['원인 미상'];
                     saveMaintCategoryOverride();
                     renderMaintCatManageList();
                     renderDefectTypeManageList();
+                    renderCauseCatSelect();
                     refreshPartCategoryViews();
                     setMasterDataBusy(false);
                 }
@@ -1942,10 +2185,12 @@
                     renderDefectTypeManageList();
                 } else {
                     DEFECT_TYPE_MAP[cat] = (DEFECT_TYPE_MAP[cat] || []).filter(d => d !== name);
+                    if (CAUSE_TYPE_MAP[cat]) delete CAUSE_TYPE_MAP[cat][name];
                     if (fd.partCategory === cat && fd.defectType === name) fd.defectType = '';
                     saveMaintCategoryOverride();
                     renderMaintCatManageList();
                     renderDefectTypeManageList();
+                    renderCauseCatSelect();
                     refreshPartCategoryViews();
                     setMasterDataBusy(false);
                 }
@@ -1953,6 +2198,233 @@
                 showToast(`삭제 실패: ${e.message}`, true);
                 setMasterDataBusy(false);
             }
+        }
+
+        // ── 이름 수정(리네임) ──────────────────────────────────────────
+        // 이 브라우저에 저장하는 방식(로컬)일 때는 바로 바꿔 줍니다.
+        // 구글시트 기준으로 쓰는 중이라면, 기준정보 시트 스크립트가 rename 동작을 지원해야 합니다.
+        // (지원하지 않으면 "삭제 후 다시 추가" 안내를 띄웁니다.)
+        function promptNewName(label, current) {
+            const v = prompt(`${label} 이름을 수정합니다.\n\n현재: ${current}`, current);
+            if (v === null) return null;                 // 취소
+            const name = v.trim();
+            if (!name) { showToast('이름을 입력해 주세요.', true); return null; }
+            if (name === current) return null;           // 그대로면 아무것도 하지 않음
+            return name;
+        }
+
+        async function renameMaintCategory(oldName) {
+            const newName = promptNewName('정비 구분', oldName);
+            if (!newName) return;
+            if (MAINT_PART_CATEGORY_LIST.includes(newName)) { showToast('이미 있는 정비 구분입니다.', true); return; }
+
+            setMasterDataBusy(true, '저장 중...');
+            try {
+                if (isMaintCategoryFromSheet) {
+                    await postMasterDataAction({ action: 'renameMaintCategory', oldName, newName });
+                    await reloadMasterDataAndRerender();
+                } else {
+                    MAINT_PART_CATEGORY_LIST = MAINT_PART_CATEGORY_LIST.map(c => (c === oldName ? newName : c));
+                    if (DEFECT_TYPE_MAP[oldName]) { DEFECT_TYPE_MAP[newName] = DEFECT_TYPE_MAP[oldName]; delete DEFECT_TYPE_MAP[oldName]; }
+                    if (CAUSE_TYPE_MAP[oldName]) { CAUSE_TYPE_MAP[newName] = CAUSE_TYPE_MAP[oldName]; delete CAUSE_TYPE_MAP[oldName]; }
+                    if (fd.partCategory === oldName) fd.partCategory = newName;
+                    saveMaintCategoryOverride();
+                    renderMaintCatManageList();
+                    renderDefectCatSelect();
+                    renderCauseCatSelect();
+                    refreshPartCategoryViews();
+                    setMasterDataBusy(false);
+                }
+                showToast(`정비 구분을 "${newName}"(으)로 수정했습니다. 이미 저장된 과거 이력의 값은 그대로 남습니다.`);
+            } catch (e) {
+                showToast(`수정 실패: ${e.message} (기준정보 시트가 이름 수정을 지원하지 않으면 삭제 후 다시 추가해 주세요.)`, true);
+                setMasterDataBusy(false);
+            }
+        }
+
+        async function renameDefectTypeItem(cat, oldName) {
+            const newName = promptNewName('불량 유형', oldName);
+            if (!newName) return;
+            if ((DEFECT_TYPE_MAP[cat] || []).includes(newName)) { showToast('이미 있는 불량 유형입니다.', true); return; }
+
+            setMasterDataBusy(true, '저장 중...');
+            try {
+                if (isMaintCategoryFromSheet) {
+                    await postMasterDataAction({ action: 'renameDefectType', category: cat, oldName, newName });
+                    await reloadMasterDataAndRerender();
+                    const sel = document.getElementById('defect-cat-select');
+                    if (sel) { sel.value = cat; renderDefectTypeManageList(); }
+                } else {
+                    DEFECT_TYPE_MAP[cat] = (DEFECT_TYPE_MAP[cat] || []).map(d => (d === oldName ? newName : d));
+                    if (CAUSE_TYPE_MAP[cat] && CAUSE_TYPE_MAP[cat][oldName]) {
+                        CAUSE_TYPE_MAP[cat][newName] = CAUSE_TYPE_MAP[cat][oldName];
+                        delete CAUSE_TYPE_MAP[cat][oldName];
+                    }
+                    if (fd.partCategory === cat && fd.defectType === oldName) fd.defectType = newName;
+                    saveMaintCategoryOverride();
+                    renderMaintCatManageList();
+                    renderDefectTypeManageList();
+                    renderCauseCatSelect();
+                    refreshPartCategoryViews();
+                    setMasterDataBusy(false);
+                }
+                showToast(`불량 유형을 "${newName}"(으)로 수정했습니다.`);
+            } catch (e) {
+                showToast(`수정 실패: ${e.message} (기준정보 시트가 이름 수정을 지원하지 않으면 삭제 후 다시 추가해 주세요.)`, true);
+                setMasterDataBusy(false);
+            }
+        }
+
+        // ── 세부 원인(불량 유형에 딸린 항목) 관리 ────────────────────────
+        function causeStorageLabel() {
+            return isMaintCategoryFromSheet
+                ? '구글시트에 저장되어 모든 기기에서 공유됩니다.'
+                : '지금은 이 브라우저(이 PC)에만 저장됩니다. 기준정보 시트에 세부 원인 항목이 준비되면 자동으로 시트 기준으로 바뀝니다.';
+        }
+
+        function renderCauseCatSelect() {
+            const sel = document.getElementById('cause-cat-select');
+            if (!sel) return;
+            const prev = sel.value;
+            sel.innerHTML = MAINT_PART_CATEGORY_LIST.map(c => `<option value="${escapeAttr(c)}">${escapeHtml(c)}</option>`).join('');
+            if (MAINT_PART_CATEGORY_LIST.includes(prev)) sel.value = prev;
+            renderCauseDefectSelect();
+        }
+
+        function renderCauseDefectSelect() {
+            const catSel = document.getElementById('cause-cat-select');
+            const sel = document.getElementById('cause-defect-select');
+            if (!catSel || !sel) return;
+            const cat = catSel.value;
+            const list = DEFECT_TYPE_MAP[cat] || [];
+            const prev = sel.value;
+            sel.innerHTML = list.length
+                ? list.map(d => `<option value="${escapeAttr(d)}">${escapeHtml(d)}</option>`).join('')
+                : '<option value="">(불량 유형 없음)</option>';
+            if (list.includes(prev)) sel.value = prev;
+            renderCauseTypeManageList();
+        }
+
+        function renderCauseTypeManageList() {
+            const catSel = document.getElementById('cause-cat-select');
+            const defSel = document.getElementById('cause-defect-select');
+            const el = document.getElementById('cause-type-list');
+            if (!catSel || !defSel || !el) return;
+
+            const noteEl = document.getElementById('cause-type-note');
+            if (noteEl) noteEl.innerText = causeStorageLabel();
+
+            const cat = catSel.value, defect = defSel.value;
+            const list = getCauseList(cat, defect);
+            el.innerHTML = list.map(c => `
+                <div class="master-item-row">
+                    <span>${escapeHtml(c)}</span>
+                    <span class="row-actions">
+                        <button class="btn-edit" onclick="renameCauseTypeItem('${escapeAttr(cat)}', '${escapeAttr(defect)}', '${escapeAttr(c)}')" title="이름 수정"><i class="fa-solid fa-pen"></i></button>
+                        <button onclick="deleteCauseTypeItem('${escapeAttr(cat)}', '${escapeAttr(defect)}', '${escapeAttr(c)}')" title="삭제"><i class="fa-solid fa-xmark"></i></button>
+                    </span>
+                </div>`).join('') || '<div class="text-xs text-gray-400 text-center py-4">등록된 세부 원인이 없습니다.</div>';
+        }
+
+        async function addCauseTypeItem() {
+            const cat = document.getElementById('cause-cat-select').value;
+            const defect = document.getElementById('cause-defect-select').value;
+            const input = document.getElementById('new-cause-type-input');
+            const name = input.value.trim();
+            if (!cat) { showToast('정비 구분을 먼저 선택해 주세요.', true); return; }
+            if (!defect) { showToast('불량 유형을 먼저 선택해 주세요.', true); return; }
+            if (!name) { showToast('세부 원인을 입력해 주세요.', true); return; }
+            if (getCauseList(cat, defect).includes(name)) { showToast('이미 있는 세부 원인입니다.', true); return; }
+
+            setMasterDataBusy(true, '저장 중...');
+            try {
+                if (isMaintCategoryFromSheet) {
+                    await postMasterDataAction({ action: 'addCauseType', category: cat, defectType: defect, name });
+                    await reloadMasterDataAndRerender();
+                    document.getElementById('cause-cat-select').value = cat;
+                    renderCauseDefectSelect();
+                    document.getElementById('cause-defect-select').value = defect;
+                    renderCauseTypeManageList();
+                } else {
+                    ensureCauseSlot(cat, defect).push(name);
+                    saveMaintCategoryOverride();
+                    renderMaintCatManageList();
+                    renderDefectTypeManageList();
+                    renderCauseTypeManageList();
+                    refreshRepairCauseSelect();
+                    setMasterDataBusy(false);
+                }
+                input.value = '';
+                showToast(`"${cat} > ${defect}"에 "${name}" 세부 원인을 추가했습니다.`);
+            } catch (e) {
+                showToast(`추가 실패: ${e.message}`, true);
+                setMasterDataBusy(false);
+            }
+        }
+
+        async function renameCauseTypeItem(cat, defect, oldName) {
+            const newName = promptNewName('세부 원인', oldName);
+            if (!newName) return;
+            if (getCauseList(cat, defect).includes(newName)) { showToast('이미 있는 세부 원인입니다.', true); return; }
+
+            setMasterDataBusy(true, '저장 중...');
+            try {
+                if (isMaintCategoryFromSheet) {
+                    await postMasterDataAction({ action: 'renameCauseType', category: cat, defectType: defect, oldName, newName });
+                    await reloadMasterDataAndRerender();
+                    document.getElementById('cause-cat-select').value = cat;
+                    renderCauseDefectSelect();
+                    document.getElementById('cause-defect-select').value = defect;
+                    renderCauseTypeManageList();
+                } else {
+                    CAUSE_TYPE_MAP[cat][defect] = getCauseList(cat, defect).map(c => (c === oldName ? newName : c));
+                    saveMaintCategoryOverride();
+                    renderCauseTypeManageList();
+                    refreshRepairCauseSelect();
+                    setMasterDataBusy(false);
+                }
+                showToast(`세부 원인을 "${newName}"(으)로 수정했습니다.`);
+            } catch (e) {
+                showToast(`수정 실패: ${e.message} (기준정보 시트가 이름 수정을 지원하지 않으면 삭제 후 다시 추가해 주세요.)`, true);
+                setMasterDataBusy(false);
+            }
+        }
+
+        async function deleteCauseTypeItem(cat, defect, name) {
+            if (!confirm(`"${cat} > ${defect}"의 세부 원인 "${name}"을(를) 삭제하시겠습니까?\n(이미 저장된 과거 수리요청서의 값은 그대로 남습니다.)`)) return;
+
+            setMasterDataBusy(true, '삭제 중...');
+            try {
+                if (isMaintCategoryFromSheet) {
+                    await postMasterDataAction({ action: 'deleteCauseType', category: cat, defectType: defect, name });
+                    await reloadMasterDataAndRerender();
+                    document.getElementById('cause-cat-select').value = cat;
+                    renderCauseDefectSelect();
+                    document.getElementById('cause-defect-select').value = defect;
+                    renderCauseTypeManageList();
+                } else {
+                    CAUSE_TYPE_MAP[cat][defect] = getCauseList(cat, defect).filter(c => c !== name);
+                    saveMaintCategoryOverride();
+                    renderMaintCatManageList();
+                    renderDefectTypeManageList();
+                    renderCauseTypeManageList();
+                    refreshRepairCauseSelect();
+                    setMasterDataBusy(false);
+                }
+                showToast(`"${name}" 세부 원인을 삭제했습니다.`);
+            } catch (e) {
+                showToast(`삭제 실패: ${e.message}`, true);
+                setMasterDataBusy(false);
+            }
+        }
+
+        // 수리요청 접수 화면이 열려 있으면 세부 원인 드롭다운도 즉시 새 목록으로 맞춰 줌
+        function refreshRepairCauseSelect() {
+            try {
+                const sel = document.getElementById('repair-cause-type');
+                if (!sel) return;
+                if (typeof updateRepairCauseTypeOptions === 'function') updateRepairCauseTypeOptions(sel.value);
+            } catch (e) { /* 수리요청 화면을 아직 열지 않았으면 무시 */ }
         }
 
         async function resetMasterData() {
@@ -3512,6 +3984,133 @@
         if (overlay) overlay.style.display = 'none';
     }
 
+    // =====================================================================
+    // ✅ 완료 사진 첨부 (부품 사진 / 작업 사진 / 완료 사진 - 각 1장)
+    //   - "수리중" 단계의 완료 처리 화면에서 선택
+    //   - 브라우저에서 용량을 줄인 뒤 base64로 전송 → GAS가 드라이브에 저장
+    //   - 스프레드시트에는 드라이브 "파일 ID"만 기록됨 (donePhotoPart/Work/Done)
+    // =====================================================================
+    const COMPLETE_PHOTO_SLOTS = [
+        { key: 'part', label: '부품 사진', icon: '🔩', field: 'donePhotoPart' },
+        { key: 'work', label: '작업 사진', icon: '🛠', field: 'donePhotoWork' },
+        { key: 'done', label: '완료 사진', icon: '✅', field: 'donePhotoDone' }
+    ];
+
+    // 화면에서 임시로 들고 있는 사진 (저장 전까지만 유지)
+    let completePhotoData = { part: '', work: '', done: '' };
+
+    function resetCompletePhotoData() {
+        completePhotoData = { part: '', work: '', done: '' };
+    }
+
+    // 사진을 가로/세로 최대 1280px, JPEG 품질 0.72로 줄여서 전송 용량을 낮춤
+    // (요즘 휴대폰 사진은 한 장에 5MB가 넘어서, 줄이지 않으면 저장이 실패할 수 있음)
+    function compressImageFile(file, maxSize, quality) {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => {
+                const img = new Image();
+                img.onload = () => {
+                    let w = img.naturalWidth || img.width;
+                    let h = img.naturalHeight || img.height;
+                    const scale = Math.min(1, maxSize / Math.max(w, h));
+                    w = Math.max(1, Math.round(w * scale));
+                    h = Math.max(1, Math.round(h * scale));
+                    const canvas = document.createElement('canvas');
+                    canvas.width = w; canvas.height = h;
+                    const ctx = canvas.getContext('2d');
+                    ctx.fillStyle = '#ffffff';
+                    ctx.fillRect(0, 0, w, h);
+                    ctx.drawImage(img, 0, 0, w, h);
+                    resolve(canvas.toDataURL('image/jpeg', quality));
+                };
+                img.onerror = () => reject(new Error('이미지 형식을 읽을 수 없습니다.'));
+                img.src = reader.result;
+            };
+            reader.onerror = () => reject(new Error('파일을 읽지 못했습니다.'));
+            reader.readAsDataURL(file);
+        });
+    }
+
+    // 완료 처리 화면에 들어가는 사진 첨부 3칸
+    function buildCompletePhotoAreaHtml() {
+        const boxes = COMPLETE_PHOTO_SLOTS.map(sl => `
+            <div style="border:1px dashed #cfd8dc; border-radius:10px; padding:10px; background:#fbfcfd;">
+                <div style="font-size:12px; font-weight:800; color:#16232E; margin-bottom:6px;">${sl.icon} ${sl.label}</div>
+                <div id="cp-preview-${sl.key}" style="width:100%; height:110px; border-radius:8px; background:#eceff1; display:flex; align-items:center; justify-content:center; color:#90a4ae; font-size:12px; overflow:hidden;">사진 없음</div>
+                <div style="display:flex; gap:6px; margin-top:8px;">
+                    <label style="flex:1; text-align:center; font-size:12px; font-weight:700; color:#fff; background:#2C93A0; border-radius:6px; padding:7px 0; cursor:pointer;">
+                        📷 사진 선택
+                        <input type="file" accept="image/*" style="display:none;" onchange="onCompletePhotoPick('${sl.key}', this)">
+                    </label>
+                    <button type="button" class="btn" style="font-size:12px; padding:6px 10px;" onclick="clearCompletePhoto('${sl.key}')">삭제</button>
+                </div>
+            </div>`).join('');
+
+        return `
+                    <div style="margin-top:14px;">
+                        <label style="font-size:12px; font-weight:700; color:#555;">완료 사진 첨부 <span style="font-weight:400; color:#999;">(부품 / 작업 / 완료 — 각 1장, 없으면 건너뛰어도 됩니다)</span></label>
+                        <div class="repair-grid-2" style="display:grid; grid-template-columns:repeat(3, 1fr); gap:10px; margin-top:6px;">${boxes}</div>
+                        <div style="font-size:11px; color:#999; margin-top:6px;">※ 사진은 자동으로 용량을 줄여 구글 드라이브에 저장되고, 스프레드시트에는 파일 ID가 기록됩니다.</div>
+                    </div>`;
+    }
+
+    async function onCompletePhotoPick(slot, inputEl) {
+        const file = inputEl && inputEl.files && inputEl.files[0];
+        if (!file) return;
+        const box = document.getElementById('cp-preview-' + slot);
+        if (box) box.innerHTML = '<span style="font-size:12px; color:#90a4ae;">사진 처리 중...</span>';
+        try {
+            const dataUrl = await compressImageFile(file, 1280, 0.72);
+            completePhotoData[slot] = dataUrl;
+            if (box) box.innerHTML = `<img src="${dataUrl}" style="width:100%; height:100%; object-fit:cover;" alt="미리보기">`;
+        } catch (e) {
+            completePhotoData[slot] = '';
+            if (box) box.innerHTML = '<span style="font-size:12px; color:#c0392b;">불러오기 실패</span>';
+            showToast('사진을 불러오지 못했습니다: ' + (e && e.message ? e.message : '알 수 없는 오류'), true);
+        }
+        inputEl.value = ''; // 같은 파일을 다시 골라도 반응하도록 초기화
+    }
+
+    function clearCompletePhoto(slot) {
+        completePhotoData[slot] = '';
+        const box = document.getElementById('cp-preview-' + slot);
+        if (box) box.innerHTML = '사진 없음';
+    }
+
+    // 완료된 건의 저장된 완료 사진 보여주기 (클릭하면 크게 보기)
+    function completePhotoThumbsHtml(item) {
+        const shots = COMPLETE_PHOTO_SLOTS
+            .map(sl => ({ sl: sl, value: item[sl.field] }))
+            .filter(x => x.value && String(x.value).trim());
+        if (shots.length === 0) return '';
+
+        const parts = shots.map(x => {
+            const fileId = extractDriveFileId(x.value);
+            const domId = 'repair-photo-' + (++_photoDomSeq);
+            if (fileId) setTimeout(() => hydrateRepairPhoto(domId, fileId, true), 0);
+            return `
+                    <div style="text-align:center;">
+                        <img id="${domId}" src="${PHOTO_PLACEHOLDER}"
+                            onclick="openRepairPhotoLightbox('${escapeAttr(fileId)}')"
+                            style="width:96px; height:96px; object-fit:cover; border-radius:8px; border:1px solid #ddd; cursor:pointer; background:#f2f2f2;"
+                            alt="${escapeAttr(x.sl.label)}">
+                        <div style="font-size:11px; color:#666; margin-top:4px; font-weight:700;">${x.sl.icon} ${escapeHtml(x.sl.label)}</div>
+                    </div>`;
+        });
+
+        return `
+                <div style="margin-top:14px; border-top:1px dashed #eee; padding-top:12px;">
+                    <div style="font-size:12px; font-weight:700; color:#555; margin-bottom:8px;">📸 완료 사진</div>
+                    <div style="display:flex; gap:12px; flex-wrap:wrap;">${parts.join('')}</div>
+                </div>`;
+    }
+
+    // 목록에 완료 사진이 있는지 표시할 때 사용
+    function hasCompletePhotos(item) {
+        return COMPLETE_PHOTO_SLOTS.some(sl => item[sl.field] && String(item[sl.field]).trim());
+    }
+
     function renderRepairStats() {
         const el = document.getElementById('repair-stats');
         if (!el) return;
@@ -3662,7 +4261,8 @@
         const bodyRows = rows.map(r => {
             const active = String(r.id) === String(selectedRepairId) ? 'background:#eef2f6;' : '';
             const hasPhoto = [r.photo1, r.photo2, r.photo3].some(p => p && String(p).trim());
-            const photoBadge = hasPhoto ? ' <span title="첨부 사진 있음" style="font-size:11px;">📷</span>' : '';
+            const photoBadge = (hasPhoto ? ' <span title="요청 시 첨부 사진 있음" style="font-size:11px;">📷</span>' : '')
+                + (hasCompletePhotos(r) ? ' <span title="완료 사진 있음" style="font-size:11px;">🟢📸</span>' : '');
             return `
             <tr onclick="selectRepairItem('${r.id}')" style="cursor:pointer; ${active}">
                 <td style="font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">[${escapeHtml(r.equipType || '-')}] ${escapeHtml(r.equipNum || '-')}</td>
@@ -3836,7 +4436,7 @@
             // 서버 저장이 확인된 뒤에만 로컬 목록에 반영해서 화면을 갱신
             repairData.unshift(Object.assign({
                 id: newId || ('temp-' + Date.now()),
-                partCategory: '', defectType: '', equipStatus: '', urgency: '', reviewNote: '', reviewerDept: '', reviewerName: '',
+                partCategory: '', defectType: '', causeType: '', equipStatus: '', urgency: '', reviewNote: '', reviewerDept: '', reviewerName: '',
                 scheduledDate: '', estimatedCost: '', repairPlan: '', repairVendor: '', selectReason: '', deptOpinion: ''
             }, payload));
             isRepairLoaded = true;
@@ -4059,6 +4659,7 @@
             maintType: item.maintType || '',
             partCategory: item.partCategory || '',
             defectType: item.defectType || '',
+            causeType: item.causeType || '',
             equipStatus: item.equipStatus || '',
             urgency: item.urgency || '',
             reviewNote: item.reviewNote || '',
@@ -4271,6 +4872,7 @@
 
     function selectRepairItem(id) {
         selectedRepairId = id;
+        resetCompletePhotoData(); // 다른 건을 선택하면 임시로 들고 있던 완료 사진을 비움
         renderRepairList();
         const item = repairData.find(r => String(r.id) === String(id));
         if (!item) return;
@@ -4334,6 +4936,7 @@
                         <label style="font-size:12px; font-weight:700; color:#555;">완료/지연 내용</label>
                         <textarea id="repair-complete-note" rows="3" placeholder="예: 부품 입고 지연으로 3일 늦게 완료됨" style="width:100%; padding:8px; border:1px solid #ddd; border-radius:6px; margin-top:4px; box-sizing:border-box;"></textarea>
                     </div>
+${buildCompletePhotoAreaHtml()}
                 </div>
             ` + buildRepairVendorEditAreaHtml(item);
             actionButtonsHtml = `
@@ -4345,6 +4948,7 @@
                 <div style="margin-top:16px; border-top:1px dashed #ddd; padding-top:16px; font-size:13px; color:#555;">
                     완료일자: <b>${escapeHtml(String(item.completeDate || '').substring(0,10) || '-')}</b>
                     ${item.completeNote ? `<div style="margin-top:6px; white-space:pre-wrap;">${escapeHtml(item.completeNote)}</div>` : ''}
+${completePhotoThumbsHtml(item)}
                 </div>
             ` + buildRepairVendorEditAreaHtml(item);
             actionButtonsHtml = '';
@@ -4399,10 +5003,17 @@
                     </div>
                     <div>
                         <label style="font-size:12px; font-weight:700; color:#555;">불량 유형</label>
-                        <select id="repair-defect-type" style="width:100%; padding:8px; border:1px solid #ddd; border-radius:6px; margin-top:4px; box-sizing:border-box;">
+                        <select id="repair-defect-type" onchange="updateRepairCauseTypeOptions()" style="width:100%; padding:8px; border:1px solid #ddd; border-radius:6px; margin-top:4px; box-sizing:border-box;">
                             <option value="">선택</option>
                         </select>
                     </div>
+                </div>
+
+                <div style="margin-bottom:12px;">
+                    <label style="font-size:12px; font-weight:700; color:#555;">세부 원인 <span style="font-weight:400; color:#999;">(불량 유형을 고르면 목록이 나타납니다)</span></label>
+                    <select id="repair-cause-type" style="width:100%; padding:8px; border:1px solid #ddd; border-radius:6px; margin-top:4px; box-sizing:border-box;">
+                        <option value="">선택</option>
+                    </select>
                 </div>
 
                 <div class="repair-grid-2" style="display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:12px;">
@@ -4452,7 +5063,7 @@
         `;
         // 업체별 항목 편집영역이 화면에 있으면(접수완료 이후 모든 단계) 저장된 값을 채워 넣음
         if (document.getElementById('repair-vendor-rows')) initRepairVendorRows(item);
-        updateRepairDefectTypeOptions(item.defectType || '');
+        updateRepairDefectTypeOptions(item.defectType || '', item.causeType || '');
         scrollToRepairDetailOnMobile();
 
         // 품의서를 처음 작성하는 단계(접수완료)에서는 과거 유사 이력을 자동으로 한 번 띄워줌.
@@ -4465,7 +5076,7 @@
 
     // "정비 구분" 선택값에 따라 "불량 유형" 드롭다운 옵션을 다시 채움
     // preselectValue를 주면(수리 요청서를 다시 열었을 때 등) 그 값을 그대로 선택된 상태로 되돌려놓음
-    function updateRepairDefectTypeOptions(preselectValue) {
+    function updateRepairDefectTypeOptions(preselectValue, preselectCause) {
         const catSelect = document.getElementById('repair-part-category');
         const defectSelect = document.getElementById('repair-defect-type');
         if (!catSelect || !defectSelect) return;
@@ -4475,6 +5086,26 @@
             options.map(d => `<option value="${escapeAttr(d)}">${escapeHtml(d)}</option>`).join('');
         if (preselectValue && options.includes(preselectValue)) {
             defectSelect.value = preselectValue;
+        }
+        // 불량 유형이 정해지면 그에 딸린 "세부 원인" 목록도 함께 다시 채움
+        updateRepairCauseTypeOptions(preselectCause);
+    }
+
+    // "불량 유형" 선택값에 따라 "세부 원인" 드롭다운 옵션을 다시 채움
+    // 목록에 없는 값이 이미 저장돼 있으면(기준정보에서 지워진 항목 등) 그 값도 옵션으로 살려서 보여줌
+    function updateRepairCauseTypeOptions(preselectValue) {
+        const catSelect = document.getElementById('repair-part-category');
+        const defectSelect = document.getElementById('repair-defect-type');
+        const causeSelect = document.getElementById('repair-cause-type');
+        if (!catSelect || !defectSelect || !causeSelect) return;
+
+        const options = getCauseList(catSelect.value, defectSelect.value).slice();
+        if (preselectValue && !options.includes(preselectValue)) options.push(preselectValue + ' (기준정보에 없음)');
+
+        causeSelect.innerHTML = '<option value="">선택</option>' +
+            options.map(c => `<option value="${escapeAttr(c)}">${escapeHtml(c)}</option>`).join('');
+        if (preselectValue) {
+            causeSelect.value = options.includes(preselectValue) ? preselectValue : (preselectValue + ' (기준정보에 없음)');
         }
     }
 
@@ -4630,7 +5261,7 @@
         const myEquipType = String(item.equipType || '').trim();
         const myEquipNo = String(item.equipNum || '').trim();
         const myPart = String(item.partCategory || '').trim();
-        const myGrams = similarityGrams([item.requestContent, item.defectType, item.partCategory].join(' '));
+        const myGrams = similarityGrams([item.requestContent, item.defectType, item.causeType, item.partCategory].join(' '));
         const today = new Date();
 
         const scored = buildSimilarGroups().map(g => {
@@ -4924,6 +5555,9 @@
         const maintTypeSelected = document.getElementById('repair-maint-type').value;
         const partCategory = document.getElementById('repair-part-category').value;
         const defectType = document.getElementById('repair-defect-type').value;
+        // "○○ (기준정보에 없음)" 형태로 보여준 값은 꼬리표를 떼고 원래 값만 저장
+        const causeTypeEl = document.getElementById('repair-cause-type');
+        const causeType = causeTypeEl ? causeTypeEl.value.replace(/ \(기준정보에 없음\)$/, '') : '';
         const equipStatus = document.getElementById('repair-equip-status').value;
         const urgency = document.getElementById('repair-urgency').value;
         const reviewNote = document.getElementById('repair-review-note').value.trim();
@@ -4937,7 +5571,7 @@
             id: item.id,
             status: newStatus,
             maintType: maintTypeSelected,
-            partCategory, defectType, equipStatus, urgency, reviewNote, reviewerDept, reviewerName
+            partCategory, defectType, causeType, equipStatus, urgency, reviewNote, reviewerDept, reviewerName
         };
 
         let validRows = [];
@@ -4987,12 +5621,22 @@
             shouldRegisterCalendar = true;
         }
 
-        // 완료: 완료일자/완료·지연 사유 저장
+        // 완료: 완료일자/완료·지연 사유 + 완료 사진(부품/작업/완료) 저장
         if (newStatus === '완료') {
             const completeDateEl = document.getElementById('repair-complete-date');
             const completeNoteEl = document.getElementById('repair-complete-note');
             payload.completeDate = completeDateEl ? completeDateEl.value : '';
             payload.completeNote = completeNoteEl ? completeNoteEl.value.trim() : '';
+
+            // 첨부된 사진만 골라서 함께 보냄 (한 장도 없으면 한 번 더 확인)
+            const completePhotos = COMPLETE_PHOTO_SLOTS
+                .filter(sl => completePhotoData[sl.key])
+                .map(sl => ({ slot: sl.key, dataUrl: completePhotoData[sl.key] }));
+
+            if (completePhotos.length === 0) {
+                if (!confirm('완료 사진(부품 / 작업 / 완료)이 한 장도 첨부되지 않았습니다.\n이대로 완료 처리할까요?')) return;
+            }
+            payload.completePhotos = completePhotos;
         }
 
         // 저장 중 표시: 클릭한 버튼 및 함께 있는 다른 처리 버튼들을 잠시 비활성화
@@ -5021,7 +5665,16 @@
             }
 
             // 서버 저장이 확인된 뒤에만 로컬 데이터에 반영해서 화면을 갱신
-            Object.assign(item, payload);
+            // (사진 원본(base64)은 화면 데이터에 남기지 않고, 서버가 돌려준 드라이브 파일 ID만 반영)
+            const localPatch = Object.assign({}, payload);
+            delete localPatch.completePhotos;
+            if (statusData && statusData.donePhotos) {
+                if (statusData.donePhotos.part) localPatch.donePhotoPart = statusData.donePhotos.part;
+                if (statusData.donePhotos.work) localPatch.donePhotoWork = statusData.donePhotos.work;
+                if (statusData.donePhotos.done) localPatch.donePhotoDone = statusData.donePhotos.done;
+            }
+            Object.assign(item, localPatch);
+            resetCompletePhotoData();
             renderRepairStats();
             renderRepairList();
 
@@ -5170,6 +5823,7 @@
                 <tr><td class="label">접수번호</td><td colspan="3">전북 정비 ${escapeHtml(item.receiptNo || '')}</td></tr>
                 <tr><td class="label">작성자</td><td colspan="3">소속: ${escapeHtml(item.requesterDept || '')} &nbsp;&nbsp; 성명: ${escapeHtml(item.requesterName || '')}</td></tr>
                 <tr><td class="label">정비 구분(부품)</td><td>${escapeHtml(item.partCategory || '-')}</td><td class="label">불량 유형</td><td>${escapeHtml(item.defectType || '-')}</td></tr>
+                <tr><td class="label">세부 원인</td><td colspan="3">${escapeHtml(item.causeType || '-')}</td></tr>
                 <tr><td class="label">장비 상태</td><td>${escapeHtml(item.equipStatus || '-')}</td><td class="label">긴급도</td><td>${escapeHtml(item.urgency || '-')}</td></tr>
                 <tr><td class="label">담당자 확인내용</td><td colspan="3" style="height:calc(42px * var(--print-scale)); white-space:pre-wrap;">${escapeHtml(item.reviewNote || '')}</td></tr>
                 <tr><td class="label">담당자</td><td colspan="3">${escapeHtml(item.reviewerDept || '')} ${escapeHtml(item.reviewerName || '')}</td></tr>
