@@ -472,21 +472,21 @@
             #view-daily.mobile-sidebar-collapsed #daily-sidebar { display: none !important; }
         }
 
-        @media (max-width: 768px) {
+        @media (max-width: 1200px) {
             html, body { width: 100%; min-width: 0; }
-            body { height: 100dvh; min-height: 100dvh; overflow: hidden; }
+            body { height: 100dvh; min-height: 100dvh; max-width: 100vw; overflow: hidden; }
 
             #global-nav { height: 56px; min-height: 56px; padding: 0 10px; gap: 8px; }
             #global-nav .nav-left { gap: 8px; min-width: 0; flex-shrink: 1; }
             #global-nav .logo-text-stack { display: none; }
-            #global-nav .tab-strip { flex: 1; max-width: none; align-self: stretch; align-items: center; gap: 4px; }
-            #global-nav .browser-tab { padding: 8px 10px; border-radius: 8px; font-size: 12px; transform: none; }
+            #global-nav .tab-strip { flex: 1 1 auto; min-width: 0; max-width: none; align-self: stretch; align-items: center; gap: 4px; overflow-x: auto; overflow-y: hidden; scroll-snap-type: x proximity; -webkit-overflow-scrolling: touch; }
+            #global-nav .browser-tab { flex: 0 0 auto; scroll-snap-align: start; padding: 8px 10px; border-radius: 8px; font-size: 12px; transform: none; }
             #global-nav .browser-tab.active { transform: none; }
             #global-nav .live-clock { display: none; }
             #breadcrumb-bar, #status-bar { padding-left: 12px; padding-right: 12px; overflow: hidden; white-space: nowrap; }
             #status-bar { display: none; }
 
-            .view-section { width: 100%; min-width: 0; }
+            .view-section, .view-section.active { width: 100% !important; min-width: 0; max-width: 100vw; flex: 1 1 auto; }
             #view-input, #view-dashboard, #view-daily { position: relative; }
             #view-input, #view-dashboard { overflow: hidden; }
             .mobile-sidebar-toggle {
@@ -506,7 +506,7 @@
             #view-dashboard.mobile-sidebar-open #dash-sidebar,
             #view-daily.mobile-sidebar-open #daily-sidebar { display: flex !important; }
             #dash-sidebar { flex-direction: column; }
-            #input-main, #dash-main { width: 100%; min-width: 0; padding: 58px 12px 12px !important; box-sizing: border-box; }
+            #input-main, #dash-main { width: 100% !important; min-width: 0; flex: 1 1 auto; padding: 58px 12px 12px !important; box-sizing: border-box; }
             #dash-main { overflow-y: auto; }
             #view-daily > div:not(#daily-sidebar):not(.mobile-sidebar-toggle) { padding: 58px 12px 12px !important; }
 
@@ -520,6 +520,8 @@
             .sheet-preview-wrap, .overflow-x-auto { max-width: 100%; overflow-x: auto; -webkit-overflow-scrolling: touch; }
             #view-repair { padding: 12px; box-sizing: border-box; overflow-y: auto; }
             #repair-layout { height: auto !important; min-height: 100%; }
+            #view-calendar { display: block !important; width: 100% !important; min-height: 0; overflow: hidden; }
+            #calendar-iframe, #livedash-iframe, #analysis-iframe, #daily-iframe, #stock-iframe { display: block; width: 100% !important; height: 100% !important; min-width: 0 !important; max-width: 100% !important; transform: none !important; zoom: 1 !important; }
             iframe { max-width: 100%; }
         }
     </style>
@@ -5968,7 +5970,7 @@ ${completePhotoThumbsHtml(item)}
         const view = document.getElementById(`view-${viewName}`);
         const button = view && view.querySelector('.mobile-sidebar-toggle');
         if (!view || !button) return;
-        const isMobile = window.matchMedia('(max-width: 768px)').matches;
+        const isMobile = window.matchMedia('(max-width: 1200px)').matches;
         const stateClass = isMobile ? 'mobile-sidebar-open' : 'mobile-sidebar-collapsed';
         const isToggled = view.classList.toggle(stateClass);
         const isVisible = isMobile ? isToggled : !isToggled;
@@ -5987,12 +5989,12 @@ ${completePhotoThumbsHtml(item)}
     }
 
     document.addEventListener('click', event => {
-        if (!window.matchMedia('(max-width: 768px)').matches) return;
+        if (!window.matchMedia('(max-width: 1200px)').matches) return;
         const sidebar = event.target.closest('#input-sidebar, #dash-sidebar, #daily-sidebar');
         if (sidebar && !event.target.closest('.mobile-sidebar-toggle')) closeMobileSidebars();
     });
     document.addEventListener('keydown', event => { if (event.key === 'Escape') closeMobileSidebars(); });
-    window.addEventListener('resize', () => { if (!window.matchMedia('(max-width: 768px)').matches) closeMobileSidebars(); });
+    window.addEventListener('resize', () => { if (!window.matchMedia('(max-width: 1200px)').matches) closeMobileSidebars(); });
 
     // srcdoc으로 포함되는 캘린더·현황판·분석 화면에도 모바일 폭과 레이아웃을 적용합니다.
     function installMobileFrameLayout(frame, type) {
@@ -6005,7 +6007,7 @@ ${completePhotoThumbsHtml(item)}
                 const style = doc.createElement('style');
                 style.id = 'mobile-frame-layout';
                 style.textContent = `
-                    @media (max-width: 768px) {
+                    @media (max-width: 1200px) {
                         html, body { width:100%; min-width:0; overflow-x:hidden !important; }
                         .app-body { flex-direction:column !important; height:auto !important; min-height:100dvh; }
                         .main-area, .content-wrapper { width:100% !important; min-width:0; box-sizing:border-box; }
@@ -6013,8 +6015,8 @@ ${completePhotoThumbsHtml(item)}
                         .side-nav { display:none !important; width:100% !important; max-height:55dvh; overflow:auto; }
                         body.mobile-inner-menu-open .side-nav { display:flex !important; }
                         .header-container { flex-wrap:wrap; gap:8px; }
-                        .calendar, #month-calendar-container { min-width:620px; }
-                        .content-wrapper { overflow-x:auto; -webkit-overflow-scrolling:touch; }
+                        .calendar, #month-calendar-container { width:100% !important; min-width:0 !important; }
+                        .content-wrapper { width:100% !important; overflow-x:hidden; -webkit-overflow-scrolling:touch; }
                         .modal { width:calc(100vw - 24px) !important; max-height:90dvh; overflow:auto; box-sizing:border-box; }
                         .wrapper { height:auto !important; min-height:100dvh; overflow:auto !important; }
                         .dashboard-grid { grid-template-columns:1fr !important; height:auto !important; }
@@ -6032,7 +6034,7 @@ ${completePhotoThumbsHtml(item)}
                     button.setAttribute('aria-expanded', 'false');
                     button.style.cssText = 'display:none;position:fixed;top:10px;left:10px;z-index:3000;padding:8px 10px;border:0;border-radius:8px;background:#16232E;color:#fff;font-weight:700;';
                     const toggleStyle = doc.createElement('style');
-                    toggleStyle.textContent = '@media (max-width:768px){#mobile-inner-menu-toggle{display:block !important}.app-body{padding-top:48px;box-sizing:border-box}}';
+                    toggleStyle.textContent = '@media (max-width:1200px){#mobile-inner-menu-toggle{display:block !important}.app-body{padding-top:48px;box-sizing:border-box}}';
                     doc.head.appendChild(toggleStyle);
                     button.addEventListener('click', () => {
                         const open = doc.body.classList.toggle('mobile-inner-menu-open');
