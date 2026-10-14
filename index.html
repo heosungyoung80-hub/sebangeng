@@ -995,6 +995,9 @@
 #auth-login-card select:focus, #auth-login-card input:focus { outline: none; border-color: #2C93A0; box-shadow: 0 0 0 3px rgba(44,147,160,.15); }
 #auth-submit { width: 100%; height: 44px; border: none; border-radius: 8px; background: #16232E; color: #fff; font-size: 15px; font-weight: 800; cursor: pointer; margin-top: 4px; font-family: inherit; }
 #auth-submit:disabled { opacity: .6; cursor: default; }
+        #auth-submit { display: flex; align-items: center; justify-content: center; gap: 8px; }   /* v17: 로그인 중 회전 아이콘 */
+        .auth-spin { width: 18px; height: 18px; flex: 0 0 auto; animation: auth-spin-rot .8s linear infinite; }
+        @keyframes auth-spin-rot { to { transform: rotate(360deg); } }
 #auth-msg { min-height: 18px; font-size: 12px; color: #dc2626; margin-top: 10px; font-weight: 700; }
 #auth-master-screen { position: fixed; inset: 0; z-index: 2000; background: #EEF0F2; display: none; flex-direction: column; font-family: 'SEBANG','Malgun Gothic',sans-serif; }
 #auth-master-bar { height: 56px; background: #fff; border-bottom: 1px solid #e2e8f0; display: flex; align-items: center; justify-content: space-between; padding: 0 22px; }
@@ -1027,9 +1030,9 @@ body.auth-master > *:not(#auth-login-overlay):not(#auth-master-screen):not(#unif
         <img id="auth-logo" alt="SEBANG 세방(주)">
         <div class="t">정비 통합 관리 시스템</div>
         <select id="auth-branch" aria-label="지사"></select>
-        <input id="auth-emp" type="text" inputmode="numeric" autocomplete="username" placeholder="사번" onkeydown="if(event.key==='Enter')document.getElementById('auth-pw').focus()">
+        <input id="auth-emp" type="text" inputmode="numeric" autocomplete="username" placeholder="사번">
         <div style="position:relative;">
-            <input id="auth-pw" type="password" autocomplete="current-password" placeholder="비밀번호" style="padding-right:86px;" oninput="AUTH.pwCount()" onkeydown="if(event.key==='Enter')AUTH.login()">
+            <input id="auth-pw" type="password" autocomplete="current-password" placeholder="비밀번호" style="padding-right:86px;" oninput="AUTH.pwCount()">
             <span id="auth-pw-count" style="position:absolute; right:44px; top:0; height:42px; line-height:42px; font-size:12px; font-weight:800; color:#2C93A0;"></span>
             <button type="button" id="auth-pw-eye" onclick="AUTH.pwToggle()" title="비밀번호 보기/숨기기" tabindex="-1" style="position:absolute; right:6px; top:4px; width:34px; height:34px; border:none; background:none; cursor:pointer; color:#64748b; font-size:14px;"><i class="fa-solid fa-eye"></i></button>
         </div>
@@ -1204,6 +1207,14 @@ const AUTH = (function () {
 
     /* ---------- 로그인 / 로그아웃 ---------- */
     function msg(t) { $('auth-msg').textContent = t || ''; }
+    // v17: 로그인 버튼 — 진행 중에는 회전 아이콘 + "로그인 중…" 표시(눌림 방지), 끝나면 원래 문구로 복구
+    function busy(on) {
+        const b = $('auth-submit'); if (!b) return;
+        b.disabled = !!on;
+        b.innerHTML = on
+            ? '<svg class="auth-spin" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="9" stroke="currentColor" stroke-opacity=".3" stroke-width="3"/><path d="M21 12a9 9 0 0 0-9-9" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg><span>로그인 중…</span>'
+            : '로그인';
+    }
     async function login() {
         const bc = $('auth-branch').value, emp = $('auth-emp').value.trim(), pw = getPw('auth-pw');
         if (!emp || !pw) { msg('사번과 비밀번호를 입력하세요.'); return; }
@@ -1214,11 +1225,12 @@ const AUTH = (function () {
             T.begin();
             sessionStorage.setItem(SESSION_KEY, JSON.stringify(session));
             setPw('auth-pw', '');
+            busy(true); msg('');
             location.reload();   // 새로 시작하면서 TEST 저장소가 처음부터 적용되게 함
             return;
         }
         try { localStorage.setItem(EMP_KEY, emp); } catch (e) {}   // v17: 마지막 입력 사번 저장
-        $('auth-submit').disabled = true; msg('');
+        busy(true); msg('');
         try {
             const r = await call({ action: 'login', branch: bc, empNo: emp, password: pw });
             if (!r || !r.ok) { msg((r && r.message) || '로그인에 실패했습니다.'); return; }
@@ -1229,7 +1241,7 @@ const AUTH = (function () {
             enter();
         } catch (e) {
             msg('서버에 연결하지 못했습니다. 인터넷 연결을 확인하세요.');
-        } finally { $('auth-submit').disabled = false; }
+        } finally { busy(false); }
     }
     function logout() {
         try { if (window.__SEBANG_TEST) window.__SEBANG_TEST.end(); } catch (e) {}   // v17: TEST 중 저장한 내용 전부 삭제
@@ -1829,9 +1841,34 @@ const AUTH = (function () {
         } catch (e) { note('복사 실패: ' + (e.message || e), true); }
     }
 
+    /* ---------- v17: 로그인 화면 Enter 키 ----------
+     * 사번·비밀번호를 입력하고 Enter 를 치면 로그인한다. (지사 선택칸에서 쳐도 동일)
+     * - 사번칸에서 Enter: 비밀번호가 비어 있으면 비밀번호칸으로 이동, 이미 있으면 바로 로그인
+     * - 한글 입력기로 입력 중(조합 중)에 친 Enter 도 놓치지 않도록, 조합이 끝난 뒤 로그인한다. */
+    function bindLoginEnter() {
+        const card = $('auth-login-card');
+        if (!card || card._enterBound) return;
+        card._enterBound = true;
+        card.addEventListener('keydown', e => {
+            if (!(e.key === 'Enter' || e.code === 'Enter' || e.code === 'NumpadEnter')) return;
+            const t = e.target;
+            if (t && (t.id === 'auth-submit' || t.id === 'auth-pw-eye')) return;   // 버튼은 기본 동작(클릭) 그대로
+            e.preventDefault();
+            const attempt = () => {
+                if (!$('auth-emp').value.trim()) { $('auth-emp').focus(); return; }
+                if (!getPw('auth-pw')) { $('auth-pw').focus(); return; }
+                if ($('auth-submit').disabled) return;
+                login();
+            };
+            if (t && t.id === 'auth-emp' && !getPw('auth-pw')) { $('auth-pw').focus(); return; }
+            if (e.isComposing || e.keyCode === 229) setTimeout(attempt, 80); else attempt();
+        });
+    }
+
     /* ---------- 시작 ---------- */
     function init() {
         bannerDragInit();
+        bindLoginEnter();
         ['auth-pw', 'auth-pw-old', 'auth-pw-new', 'auth-pw-new2'].forEach(id => maskify($(id)));
         const navImg = document.querySelector('#global-nav .nav-left img');
         if (navImg) { $('auth-logo').src = navImg.src; $('auth-logo2').src = navImg.src; }
