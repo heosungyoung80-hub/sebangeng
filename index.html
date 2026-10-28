@@ -3634,6 +3634,7 @@ const AUTH = (function () {
                 return true;
             } catch (e) {
                 console.warn('기준정보 시트 연동 실패, 기본값 사용:', e);
+                window.__masterFailReason = (e && e.message) ? e.message : String(e);
                 rebuildMasterData();
                 isMasterDataFromSheet = false;
                 return false;
@@ -3664,7 +3665,7 @@ const AUTH = (function () {
         async function reloadMasterDataAndRerender() {
             setMasterDataBusy(true, '불러오는 중...');
             const ok = await fetchMasterDataFromSheet();
-            if (!ok) showToast('기준정보 시트 연동에 실패해 기본값을 표시합니다.', true);
+            if (!ok) showToast('기준정보 시트 연동에 실패해 기본값을 표시합니다.' + (window.__masterFailReason ? ' [사유: ' + window.__masterFailReason + ']' : ''), true);
 
             renderEquipTypes();
             renderEquipNums(fd.equip || '');
