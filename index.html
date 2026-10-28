@@ -1790,12 +1790,13 @@ const AUTH = (function () {
         return { code: c, name: nameOf(c), all: false };
     };
     let mdLegacy = false, mdLegacyToasted = false;
-    function mdEmpty(d) { return !Object.keys(d.equipData || {}).length && !(d.vendors || []).length && !(d.maintCategories || []).length; }
+    function mdEmpty(d) { return !Object.keys(d.equipData || {}).length; }   // 장비 목록이 없으면 비어 있는 것으로 봄(정비 구분만 있어도 예전 시트로 대체)
     async function mdFetch() {
         if (!session) throw new Error('로그인이 필요합니다.');
         const r = await call({ action: 'mdGet', token: session.token, branch: dataBranch() });
         if (!r || !r.ok) throw new Error((r && r.message) || '기준정보를 불러오지 못했습니다.');
         mdLegacy = false;
+        window.__mdBranchName = nameOf(dataBranch());
         // 전북 기준정보가 아직 새 서버로 옮겨지지 않았으면, 옮기기 전까지 기존 시트 값을 그대로 사용 (목록이 텅 비는 것을 막음)
         if (mdEmpty(r) && String(nameOf(dataBranch())).replace(/\s|지사/g, '') === LEGACY_DATA_BRANCH_NAME) {
             try {
@@ -3613,7 +3614,7 @@ const AUTH = (function () {
                 }
                 // 장비 목록이 비어 있으면(지사 기준정보 미등록 등) 선택 화면이 텅 비므로 기본 목록으로 대체
                 if (typeof data.equipData !== 'object' || Array.isArray(data.equipData) || !Object.keys(data.equipData).length) {
-                    throw new Error('서버 기준정보에 장비 목록이 비어 있습니다.');
+                    throw new Error('서버 기준정보에 장비 목록이 비어 있습니다.' + (window.__mdBranchName ? ' (조회 지사: ' + window.__mdBranchName + ')' : ''));
                 }
                 EQUIP_DATA = data.equipData;
                 EQUIP_LIST = Object.keys(EQUIP_DATA);
