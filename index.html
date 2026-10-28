@@ -1014,7 +1014,7 @@
 .auth-btn.primary { background: #16232E; border-color: #16232E; color: #fff; }
 .auth-btn:disabled { opacity: .5; cursor: default; }
 #auth-empty-panel { position: fixed; left: 0; right: 0; bottom: 0; z-index: 60; background: #EEF0F2; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 24px; font-family: 'SEBANG','Malgun Gothic',sans-serif; }
-body.auth-empty-data .view-section:not(#view-home) { display: none !important; }
+body.auth-empty-data .view-section:not(#view-home):not(#view-repair) { display: none !important; }
 .auth-ro button, .auth-ro input, .auth-ro [onclick] { pointer-events: none !important; opacity: .45; }
 .auth-ro-note { margin: 8px 0 12px; padding: 8px 12px; border-radius: 8px; background: #FEF3C7; color: #92400E; font-size: 12px; font-weight: 700; }
 .auth-table { width: 100%; border-collapse: collapse; font-size: 13px; }
@@ -1498,7 +1498,7 @@ const AUTH = (function () {
         document.body.classList.toggle('auth-empty-data', blocked);
         const p = $('auth-empty-panel');
         const view = (typeof currentOuterView !== 'undefined') ? currentOuterView : 'home';
-        if (!blocked || view === 'home') { p.classList.add('auth-hide'); return; }
+        if (!blocked || view === 'home' || view === 'repair') { p.classList.add('auth-hide'); return; }
         const bar = document.getElementById('status-bar') || document.getElementById('global-nav');
         p.style.top = (bar ? Math.max(0, bar.getBoundingClientRect().bottom) : 0) + 'px';
         $('auth-empty-branch').textContent = viewing ? nameOf(viewing) : session.user.branchName;
@@ -1778,6 +1778,17 @@ const AUTH = (function () {
         return session ? session.user.branchCode : '';
     }
     function nameOf(code) { const b = branchList.find(x => x[0] === code); return b ? b[1] : code; }
+    /* 수리요청 연동용: 현재 화면의 지사. all=true 면 전체 지사(본사/MASTER 전체 보기) */
+    window.repairBranchInfo = function () {
+        if (!session) return { code: '05', name: '전북', all: false };
+        const u = session.user;
+        if (!viewing && (u.isMaster || u.viewAll)) {
+            const c = u.isMaster ? '05' : (u.branchCode || '12');   // 접수(쓰기) 대상: MASTER 는 전북, 본사는 본사 탭
+            return { code: c, name: nameOf(c), all: true };
+        }
+        const c = viewing || u.branchCode || '05';
+        return { code: c, name: nameOf(c), all: false };
+    };
     let mdLegacy = false, mdLegacyToasted = false;
     function mdEmpty(d) { return !Object.keys(d.equipData || {}).length && !(d.vendors || []).length && !(d.maintCategories || []).length; }
     async function mdFetch() {
@@ -5800,7 +5811,8 @@ const AUTH = (function () {
             return;
         }
         try {
-            const bustUrl = `${REPAIR_GAS_URL}${REPAIR_GAS_URL.includes('?') ? '&' : '?'}_ts=${Date.now()}`;
+            const rb = (window.repairBranchInfo ? window.repairBranchInfo() : { code: '05', all: false });
+            const bustUrl = `${REPAIR_GAS_URL}${REPAIR_GAS_URL.includes('?') ? '&' : '?'}${rb.all ? 'branch=all&' : 'branch=' + encodeURIComponent(rb.code) + '&'}_ts=${Date.now()}`;
             const res = await fetch(bustUrl, { cache: 'no-store' });
             const data = await res.json();
             repairData = Array.isArray(data) ? data : (data.rows || []);
@@ -6338,11 +6350,13 @@ const AUTH = (function () {
 
             const receiptNo = generateReceiptNo();
             const today = new Date().toISOString().substring(0, 10);
-            const REQ_DEPT = '전북지사 하역팀', REQ_NAME = '캘린더등록';   // 소속: 전북지사 하역팀 / 성명: 캘린더등록
+            const RB = window.repairBranchInfo();
+            const REQ_DEPT = RB.name + (RB.name === '본사' ? ' ' : '지사 ') + '하역팀', REQ_NAME = '캘린더등록';   // 소속: 로그인 지사 하역팀 / 성명: 캘린더등록
 
             // 1) 요청서 생성
             const createPayload = {
                 action: 'create',
+                branchCode: RB.code, branchName: RB.name,
                 equipType: d.type, equipNum: d.num,
                 requestDate: today, maintType: '계획정비',
                 requestContent: d.content,
@@ -6845,8 +6859,10 @@ const AUTH = (function () {
             return;
         }
 
+        const RB2 = window.repairBranchInfo();
         const payload = {
             action: 'create',
+            branchCode: RB2.code, branchName: RB2.name,
             equipType, equipNum, requestDate, maintType, requestContent, requesterDept, requesterName, requesterPhone,
             receiptNo: generateReceiptNo(),
             linkToken: generatePcLinkToken(),
