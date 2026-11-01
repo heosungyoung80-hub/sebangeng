@@ -1064,7 +1064,8 @@ body.auth-master > *:not(#auth-login-overlay):not(#auth-master-screen):not(#unif
                 <span style="color:#64748b;font-size:12px;">기준정보 관리는 이 지사의 항목에 적용됩니다.</span>
             </div>
             <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:10px;">
-                <button class="auth-btn" onclick="AUTH.importLegacy()"><i class="fa-solid fa-download"></i> 기존 시트에서 가져오기</button>
+                <button class="auth-btn" onclick="AUTH.importLegacy()"><i class="fa-solid fa-download"></i> 시트에서 가져오기 (위 지사)</button>
+                <button class="auth-btn" onclick="AUTH.importAllFromSheet()"><i class="fa-solid fa-cloud-arrow-down"></i> 시트의 모든 지사 한 번에 가져오기</button>
                 <span style="color:#94a3b8;">|</span>
                 <select id="auth-master-from" style="border:1px solid #cbd5e1;border-radius:6px;padding:6px 10px;font-size:13px;"></select>
                 <button class="auth-btn" onclick="AUTH.copyFrom()"><i class="fa-solid fa-copy"></i> 위 지사로 복사</button>
@@ -1825,13 +1826,14 @@ const AUTH = (function () {
     function note(t, err) { const n = $('auth-master-note'); n.style.color = err ? '#dc2626' : '#15803d'; n.textContent = t; }
     async function importLegacy() {
         const tgt = dataBranch();
-        if (!confirm(nameOf(tgt) + ' 지사의 기준정보를 모두 지우고, 기존 구글시트(옛 기준정보 서버)의 내용으로 교체합니다.\n계속할까요?')) return;
+        if (!confirm(nameOf(tgt) + ' 지사의 기준정보를 모두 지우고, 기준정보 구글시트의 "' + nameOf(tgt) + '" 탭 내용으로 교체합니다.\n계속할까요?')) return;
         note('기존 시트를 불러오는 중...');
         try {
             let url = DEFAULT_MASTER_DATA_URL;
             try { url = localStorage.getItem(MASTER_DATA_URL_STORAGE_KEY) || url; } catch (e) {}
-            const res = await fetch(url + (url.includes('?') ? '&' : '?') + '_ts=' + Date.now(), { cache: 'no-store' });
+            const res = await fetch(url + (url.includes('?') ? '&' : '?') + 'branch=' + encodeURIComponent(tgt) + '&_ts=' + Date.now(), { cache: 'no-store' });
             const d = await res.json();
+            if (d && d.result === 'error') throw new Error(d.message || '시트에서 오류가 왔습니다.');
             if (!d || !d.equipData || !d.vendors) throw new Error('기존 시트 응답 형식이 올바르지 않습니다.');
             const hasMaint = Array.isArray(d.maintCategories) && d.maintCategories.length;
             // 시트에 정비 구분이 없으면 이 브라우저에 저장해 둔 목록(예전 방식)을 먼저 쓰고, 그것도 없으면 기본값을 사용
@@ -1848,6 +1850,40 @@ const AUTH = (function () {
             const r = await call({ action: 'mdImport', token: session.token, branch: tgt, data });
             if (!r.ok) throw new Error(r.message || '저장 실패');
             note(nameOf(tgt) + ' 지사 기준정보를 가져왔습니다. (장비 구분 ' + Object.keys(data.equipData).length + '개 · 거래처 ' + data.vendors.length + '개 · 정비 구분 ' + data.maintCategories.length + '개 [' + src + '])');
+        } catch (e) { note('가져오기 실패: ' + (e.message || e), true); }
+    }
+    /* 기준정보 시트의 모든 지사 탭을 한 번에 가져오기 (자료가 있는 지사만) */
+    async function importAllFromSheet() {
+        if (!confirm('기준정보 구글시트에 자료가 있는 모든 지사를 가져옵니다.\n각 지사의 현재 기준정보는 시트 내용으로 교체됩니다. (앱에서 따로 수정한 내용이 있으면 사라집니다)\n계속할까요?')) return;
+        note('시트를 불러오는 중...');
+        try {
+            let url = DEFAULT_MASTER_DATA_URL;
+            try { url = localStorage.getItem(MASTER_DATA_URL_STORAGE_KEY) || url; } catch (e) {}
+            const res = await fetch(url + (url.includes('?') ? '&' : '?') + 'action=all&_ts=' + Date.now(), { cache: 'no-store' });
+            const all = await res.json();
+            if (!all || all.result !== 'success' || !all.data) throw new Error((all && all.message) || '시트 응답 형식이 올바르지 않습니다.');
+            let local = null;
+            try { local = JSON.parse(localStorage.getItem(MAINT_CATEGORY_STORAGE_KEY) || 'null'); } catch (e) {}
+            const done = [], skipped = [];
+            const codes = Object.keys(all.data);
+            for (let i = 0; i < codes.length; i++) {
+                const code = codes[i], d = all.data[code], nm = (all.names && all.names[code]) || nameOf(code);
+                const hasData = (d.vendors || []).length || Object.keys(d.equipData || {}).length;
+                if (!hasData) { skipped.push(nm); continue; }
+                note('가져오는 중... ' + nm + ' (' + (i + 1) + '/' + codes.length + ')');
+                const hasMaint = Array.isArray(d.maintCategories) && d.maintCategories.length;
+                const hasLocal = !hasMaint && local && Array.isArray(local.categories) && local.categories.length;
+                const data = {
+                    equipData: d.equipData || {}, vendors: d.vendors || [],
+                    maintCategories: hasMaint ? d.maintCategories : (hasLocal ? local.categories : DEFAULT_MAINT_PART_CATEGORY_LIST),
+                    defectTypes: hasMaint && d.defectTypes ? d.defectTypes : (hasLocal && local.defects ? local.defects : DEFAULT_DEFECT_TYPE_MAP),
+                    causeTypes: hasMaint && d.causeTypes ? d.causeTypes : (hasLocal && local.causes ? local.causes : DEFAULT_CAUSE_TYPE_MAP)
+                };
+                const r = await call({ action: 'mdImport', token: session.token, branch: code, data });
+                if (!r.ok) throw new Error(nm + ': ' + (r.message || '저장 실패'));
+                done.push(nm + '(장비 ' + Object.keys(data.equipData).length + '·거래처 ' + data.vendors.length + ')');
+            }
+            note('가져오기 완료 — ' + (done.join(', ') || '없음') + (skipped.length ? ' / 자료가 없어 건너뜀: ' + skipped.join(', ') : ''));
         } catch (e) { note('가져오기 실패: ' + (e.message || e), true); }
     }
     async function copyFrom() {
@@ -1918,7 +1954,7 @@ const AUTH = (function () {
     }
     window.addEventListener('load', init);
 
-    return { login, logout, openPw, closePw, changePw, openCard, openUpload, closeUpload, onFile, doUpload, pwCount, pwToggle, viewBranch, exitView, openUsers, closeUsers, renderUsers, userForm, userFormClose, userSave, openPerms, closePerms, savePerms, mdFetch, mdPost, importLegacy, copyFrom, canEdit, loadXlsx };
+    return { importAllFromSheet, login, logout, openPw, closePw, changePw, openCard, openUpload, closeUpload, onFile, doUpload, pwCount, pwToggle, viewBranch, exitView, openUsers, closeUsers, renderUsers, userForm, userFormClose, userSave, openPerms, closePerms, savePerms, mdFetch, mdPost, importLegacy, copyFrom, canEdit, loadXlsx };
 })();
 </script>
 
