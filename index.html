@@ -2842,6 +2842,7 @@ const AUTH = (function () {
                 }, 80);
             }
             if(viewName === 'calendar') {
+                if (isCalendarLoaded) { try { syncCalendarEquip(); } catch (e) {} }
                 if (!isCalendarLoaded) {
                 document.getElementById('calendar-iframe').srcdoc = getCalendarHtmlWithOverrides();
                 injectSebangFont(document.getElementById('calendar-iframe'));
@@ -3015,6 +3016,14 @@ const AUTH = (function () {
         }
 
         // 설정에서 캘린더용 시트 주소를 바꿔놨으면, 삽입 직전에 기본 주소를 그 값으로 치환
+        // 이미 열려 있는 캘린더에 현재 지사의 기종/호기 목록을 다시 넣어줌
+        function syncCalendarEquip() {
+            try {
+                const fr = document.getElementById('calendar-iframe');
+                const w = fr && fr.contentWindow;
+                if (w && typeof w.__refreshEquip === 'function') w.__refreshEquip(w.JSON.parse(JSON.stringify(EQUIP_DATA || {})));
+            } catch (e) {}
+        }
         function getCalendarHtmlWithOverrides() {
             let html = CALENDAR_HTML_SRC;
             // 모바일에서 월간 뷰 자동 전환 스크립트 주입
@@ -3357,6 +3366,8 @@ const AUTH = (function () {
             try {
                 const eqJson = JSON.stringify(EQUIP_DATA || {}).replace(/</g, '\\u003c');
                 html = html.replace(/const EQUIP_DATA = \{[\s\S]*?\n\};/, function () { return 'var EQUIP_DATA = ' + eqJson + ';'; });
+                const rf = "<script>window.__refreshEquip=function(d){try{window.EQUIP_DATA=d;var pt=document.getElementById('pop-type');if(pt){var prev=pt.value;pt.innerHTML='';Object.keys(d).forEach(function(k){var o=document.createElement('option');o.value=k;o.textContent=k;pt.appendChild(o);});if(prev&&d[prev])pt.value=prev;if(typeof updatePopNumbers==='function')updatePopNumbers();}if(typeof initTimelineModule==='function')initTimelineModule();}catch(e){}};<\/script>";
+                html = html.replace('</body>', rf + '</body>');
             } catch (e) { console.warn('캘린더 장비 목록 반영 실패:', e); }
             try {
                 html = html.replace(/(<select id="pop-part-category">)[\s\S]*?(<\/select>)/,
@@ -3670,7 +3681,7 @@ const AUTH = (function () {
                 EQUIP_DATA = data.equipData;
                 EQUIP_LIST = Object.keys(EQUIP_DATA);
                 NUM_LIST = Object.values(EQUIP_DATA).flat();
-                try { if (typeof currentOuterView === 'undefined' || currentOuterView !== 'calendar') window.resetCalLiveFrames && window.resetCalLiveFrames(); } catch (e) {}
+                try { syncCalendarEquip(); } catch (e) {}
                 VENDOR_LIST = data.vendors;
                 // 기준정보 시트가 정비 구분(maintCategories)까지 내려주면 그 값을 기준으로 사용하고,
                 // 아직 시트에 해당 항목이 없으면 이 브라우저에 저장해 둔 목록을 사용합니다.
