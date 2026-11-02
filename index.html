@@ -1014,7 +1014,7 @@
 .auth-btn.primary { background: #16232E; border-color: #16232E; color: #fff; }
 .auth-btn:disabled { opacity: .5; cursor: default; }
 #auth-empty-panel { position: fixed; left: 0; right: 0; bottom: 0; z-index: 60; background: #EEF0F2; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 24px; font-family: 'SEBANG','Malgun Gothic',sans-serif; }
-body.auth-empty-data .view-section:not(#view-home):not(#view-repair):not(#view-input):not(#view-dashboard):not(#view-analysis) { display: none !important; }
+body.auth-empty-data .view-section:not(#view-home):not(#view-repair):not(#view-input):not(#view-dashboard):not(#view-analysis):not(#view-board) { display: none !important; }
 .auth-ro button, .auth-ro input, .auth-ro [onclick] { pointer-events: none !important; opacity: .45; }
 .auth-ro-note { margin: 8px 0 12px; padding: 8px 12px; border-radius: 8px; background: #FEF3C7; color: #92400E; font-size: 12px; font-weight: 700; }
 .auth-table { width: 100%; border-collapse: collapse; font-size: 13px; }
@@ -1499,7 +1499,7 @@ const AUTH = (function () {
         document.body.classList.toggle('auth-empty-data', blocked);
         const p = $('auth-empty-panel');
         const view = (typeof currentOuterView !== 'undefined') ? currentOuterView : 'home';
-        if (!blocked || view === 'home' || view === 'repair' || view === 'input' || view === 'dashboard' || view === 'analysis') { p.classList.add('auth-hide'); return; }
+        if (!blocked || view === 'home' || view === 'repair' || view === 'input' || view === 'dashboard' || view === 'analysis' || view === 'board') { p.classList.add('auth-hide'); return; }
         const bar = document.getElementById('status-bar') || document.getElementById('global-nav');
         p.style.top = (bar ? Math.max(0, bar.getBoundingClientRect().bottom) : 0) + 'px';
         $('auth-empty-branch').textContent = viewing ? nameOf(viewing) : session.user.branchName;
@@ -5797,7 +5797,7 @@ const AUTH = (function () {
        - 별도 구글시트(Apps Script 웹앱)와 연동됩니다.
        - REPAIR_GAS_URL은 설정(⚙) 버튼을 눌러 배포 후 저장하면 됩니다.
        ========================================================= */
-    const DEFAULT_REPAIR_GAS_URL = (window.__SEBANG_TEST && window.__SEBANG_TEST.active) ? window.__SEBANG_TEST.FAKE_REPAIR : 'REPLACE_WITH_YOUR_REPAIR_APPS_SCRIPT_URL';
+    const DEFAULT_REPAIR_GAS_URL = (window.__SEBANG_TEST && window.__SEBANG_TEST.active) ? window.__SEBANG_TEST.FAKE_REPAIR : 'https://script.google.com/macros/s/AKfycbw8gfNkYkx4HdweEJOQMa9VjxA4sTc5II3_wNO0MzYw5ZnoPFhaED70D1kGWTHL2LVZMA/exec';   // 모든 지사 PC 공통 (⚙ 설정으로 바꾸면 그 브라우저만 다른 주소 사용)
     const REPAIR_GAS_URL_STORAGE_KEY = 'sebang_repair_gas_url_override';
     let REPAIR_GAS_URL = (function() {
         try { return localStorage.getItem(REPAIR_GAS_URL_STORAGE_KEY) || DEFAULT_REPAIR_GAS_URL; }
@@ -8603,7 +8603,7 @@ ${completePhotoThumbsHtml(item)}
    - 별도 구글시트 + 구글드라이브(Apps Script 웹앱)와 연동됩니다.
    - 연동 주소는 게시판 화면의 설정(톱니) 버튼으로 입력합니다.
    ========================================================= */
-const DEFAULT_BOARD_GAS_URL = (window.__SEBANG_TEST && window.__SEBANG_TEST.active) ? window.__SEBANG_TEST.FAKE_BOARD : 'REPLACE_WITH_YOUR_BOARD_APPS_SCRIPT_URL';
+const DEFAULT_BOARD_GAS_URL = (window.__SEBANG_TEST && window.__SEBANG_TEST.active) ? window.__SEBANG_TEST.FAKE_BOARD : 'https://script.google.com/macros/s/AKfycbz-MZDL-lvyfB6FaFHMKYWoGwplc1FCOA7pN-lQ9WdFf6t6zBHDMZ0ZXJVjKevC0RF4/exec';
 const BOARD_GAS_URL_STORAGE_KEY = 'sebang_board_gas_url_override';
 let BOARD_GAS_URL = (function() {
     try { return localStorage.getItem(BOARD_GAS_URL_STORAGE_KEY) || DEFAULT_BOARD_GAS_URL; }
@@ -8718,8 +8718,11 @@ function normalizeBoardRow(r) {
     return Object.assign({}, r, { files: Array.isArray(files) ? files : [] });
 }
 
+let boardBranchKey = '';
+function boardBranch() { try { return window.repairBranchInfo ? window.repairBranchInfo() : { code: '', name: '전북', all: false }; } catch (e) { return { code: '', name: '전북', all: false }; } }
 async function loadBoardData(force) {
     const body = bdEl('board-list-body');
+    { const bb = boardBranch(), key = bb.all ? 'all' : bb.code; if (key !== boardBranchKey) { boardBranchKey = key; isBoardLoaded = false; boardData = []; } }
     buildBoardFilterOptions();
     renderBoardChips();
     if (isBoardLoaded && !force) { renderBoardList(); return; }
@@ -8732,7 +8735,8 @@ async function loadBoardData(force) {
     if (body && !background) body.innerHTML = '<div class="bd-empty">불러오는 중...</div>';
     try {
         const sep = BOARD_GAS_URL.includes('?') ? '&' : '?';
-        const res = await fetch(`${BOARD_GAS_URL}${sep}_ts=${Date.now()}`, { cache: 'no-store' });
+        const bb = boardBranch();
+        const res = await fetch(`${BOARD_GAS_URL}${sep}branch=${encodeURIComponent(bb.all ? 'all' : (bb.code || bb.name))}&_ts=${Date.now()}`, { cache: 'no-store' });
         const data = await res.json();
         if (data && data.result === 'error') throw new Error(data.message || '서버 오류');
         const rows = Array.isArray(data) ? data : (data.rows || []);
@@ -8935,7 +8939,8 @@ async function submitBoardForm() {
     try {
         const files = [];
         for (const p of boardPending) files.push(await bdPrepareFile(p.file));
-        const payload = { action: 'create', equipType, equipNum, title, category, docDate, vendor, memo, createdAt: new Date().toISOString(), files };
+        const bbw = boardBranch();
+        const payload = { action: 'create', branchCode: bbw.code, branchName: bbw.name, equipType, equipNum, title, category, docDate, vendor, memo, createdAt: new Date().toISOString(), files };
         const res = await fetch(BOARD_GAS_URL, { method: 'POST', body: JSON.stringify(payload) });
         if (!res.ok) throw new Error('서버 응답 오류 (HTTP ' + res.status + ')');
         let data = null;
@@ -9030,7 +9035,7 @@ async function deleteBoardItem(id) {
     if (!r) return;
     if (!confirm('이 자료를 삭제할까요?\n\n' + r.title + '\n(첨부 파일은 드라이브 휴지통으로 이동합니다)')) return;
     try {
-        const res = await fetch(BOARD_GAS_URL, { method: 'POST', body: JSON.stringify({ action: 'delete', id: r.id }) });
+        const res = await fetch(BOARD_GAS_URL, { method: 'POST', body: JSON.stringify({ action: 'delete', id: r.id, branchCode: boardBranch().code }) });
         let data = null;
         try { data = await res.json(); } catch (e) {}
         if (!data || data.result !== 'success') throw new Error((data && data.message) || '삭제 결과를 확인하지 못했습니다.');
