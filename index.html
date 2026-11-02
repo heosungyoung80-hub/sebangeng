@@ -1123,6 +1123,7 @@ body.auth-master > *:not(#auth-login-overlay):not(#auth-master-screen):not(#unif
         <div id="auth-user-form" class="auth-hide" style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:12px;margin-bottom:10px;flex-wrap:wrap;gap:8px;align-items:center;">
             <input id="auth-uf-name" class="auth-field" placeholder="이름" style="width:110px;">
             <input id="auth-uf-emp" class="auth-field" placeholder="사번" style="width:120px;">
+            <input id="auth-uf-email" class="auth-field" type="email" placeholder="이메일 (비밀번호 안내용, 선택)" style="width:210px;">
             <select id="auth-uf-branch" class="auth-field"></select>
             <select id="auth-uf-role" class="auth-field"><option>MASTER관리자</option><option>관리자</option><option selected>일반사용자</option></select>
             <button class="auth-btn primary auth-sm" onclick="AUTH.userSave()">저장</button>
@@ -1131,7 +1132,7 @@ body.auth-master > *:not(#auth-login-overlay):not(#auth-master-screen):not(#unif
         </div>
         <div id="auth-users-msg" style="min-height:18px;font-size:12px;font-weight:700;margin-bottom:6px;"></div>
         <div id="auth-pwreq-box" class="auth-hide" style="background:#fff7ed;border:1px solid #fdba74;border-radius:10px;padding:10px 12px;margin-bottom:10px;font-size:13px;"></div>
-        <table class="auth-table"><thead><tr><th>이름</th><th>사번</th><th>지사</th><th>권한</th><th>비밀번호</th><th>관리</th></tr></thead><tbody id="auth-users-body"></tbody></table>
+        <table class="auth-table"><thead><tr><th>이름</th><th>사번</th><th>지사</th><th>권한</th><th>이메일</th><th>비밀번호</th><th>관리</th></tr></thead><tbody id="auth-users-body"></tbody></table>
         <div style="display:flex;justify-content:space-between;align-items:center;margin-top:14px;">
             <span id="auth-users-count" style="font-size:12px;color:#64748b;"></span>
             <button class="auth-btn" onclick="AUTH.closeUsers()">닫기</button>
@@ -1668,11 +1669,12 @@ const AUTH = (function () {
     function renderUsers() {
         const q = $('auth-users-q').value.trim().toLowerCase();
         const body = $('auth-users-body'); body.innerHTML = '';
-        const list = userRows.filter(u => !q || [u.name, u.empNo, u.branch, u.role].join(' ').toLowerCase().indexOf(q) >= 0);
+        const list = userRows.filter(u => !q || [u.name, u.empNo, u.branch, u.role, u.email || ''].join(' ').toLowerCase().indexOf(q) >= 0);
         list.forEach(u => {
             const tr = document.createElement('tr');
             tdText(tr, u.name).style.fontWeight = '700';
             tdText(tr, u.empNo); tdText(tr, u.branch); tdText(tr, u.role);
+            { const te = tdText(tr, u.email || '미등록'); te.style.fontSize = '12px'; te.style.color = u.email ? '#475569' : '#94a3b8'; }
             tdText(tr, u.pwChanged ? '변경됨' : '초기(000000)').style.color = u.pwChanged ? '#475569' : '#b45309';
             const act = document.createElement('td');
             act.appendChild(smallBtn('수정', () => userForm(u)));
@@ -1690,6 +1692,7 @@ const AUTH = (function () {
         editOrig = u ? u.empNo : null;
         $('auth-uf-name').value = u ? u.name : '';
         $('auth-uf-emp').value = u ? u.empNo : '';
+        $('auth-uf-email').value = u ? (u.email || '') : '';
         if (u) { if (![...sel.options].some(o => o.value === u.branch)) { const o = document.createElement('option'); o.value = u.branch; o.textContent = u.branch; sel.appendChild(o); } sel.value = u.branch; }
         $('auth-uf-role').value = u ? u.role : '일반사용자';
         $('auth-user-form').classList.remove('auth-hide');
@@ -1699,7 +1702,7 @@ const AUTH = (function () {
     async function userSave() {
         const body = { action: 'userSave', token: session.token, originalEmpNo: editOrig || '',
             name: $('auth-uf-name').value.trim(), empNo: $('auth-uf-emp').value.trim(),
-            branch: $('auth-uf-branch').value, role: $('auth-uf-role').value };
+            branch: $('auth-uf-branch').value, role: $('auth-uf-role').value, email: $('auth-uf-email').value.trim() };
         if (!body.name || !body.empNo) { usersMsg('이름과 사번을 입력하세요.', true); return; }
         try {
             const r = await call(body);
@@ -1720,7 +1723,7 @@ const AUTH = (function () {
         try {
             const r = await call({ action: 'resetPassword', token: session.token, empNo: u.empNo });
             if (!r.ok) throw new Error(r.message || '초기화 실패');
-            await loadUsers(); usersMsg('초기화했습니다.');
+            await loadUsers(); usersMsg(r.message || '초기화했습니다.');
         } catch (e) { usersMsg(e.message || String(e), true); }
     }
 
