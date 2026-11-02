@@ -3353,6 +3353,11 @@ const AUTH = (function () {
                 html = html.split(DEFAULT_CALENDAR_SERVER_URL).join(customServerUrl);
             }
             // 캘린더 팝업의 "정비 구분(부품)" 목록도 기준정보에서 관리하는 최신 목록으로 맞춰줌
+            // 캘린더의 기종/호기 목록: 전북 고정값 대신 현재 지사의 기준정보(EQUIP_DATA)를 사용
+            try {
+                const eqJson = JSON.stringify(EQUIP_DATA || {}).replace(/</g, '\\u003c');
+                html = html.replace(/const EQUIP_DATA = \{[\s\S]*?\n\};/, function () { return 'var EQUIP_DATA = ' + eqJson + ';'; });
+            } catch (e) { console.warn('캘린더 장비 목록 반영 실패:', e); }
             try {
                 html = html.replace(/(<select id="pop-part-category">)[\s\S]*?(<\/select>)/,
                     function(_m, open, close) { return open + calendarPartCategoryOptionsHtml() + close; });
@@ -3665,6 +3670,7 @@ const AUTH = (function () {
                 EQUIP_DATA = data.equipData;
                 EQUIP_LIST = Object.keys(EQUIP_DATA);
                 NUM_LIST = Object.values(EQUIP_DATA).flat();
+                try { if (typeof currentOuterView === 'undefined' || currentOuterView !== 'calendar') window.resetCalLiveFrames && window.resetCalLiveFrames(); } catch (e) {}
                 VENDOR_LIST = data.vendors;
                 // 기준정보 시트가 정비 구분(maintCategories)까지 내려주면 그 값을 기준으로 사용하고,
                 // 아직 시트에 해당 항목이 없으면 이 브라우저에 저장해 둔 목록을 사용합니다.
