@@ -1874,6 +1874,7 @@ const AUTH = (function () {
         if (session && session.user.isMaster) return viewing || $('auth-master-target').value || codeOfName('전북');
         return session ? session.user.branchCode : '';
     }
+    window.__branchNames = function () { return branchList.filter(b => !/^MASTER/i.test(String(b[1]).replace(/\s/g, ''))).map(b => ({ code: b[0], name: b[1] })); };
     function nameOf(code) { if (code === 'all' || code === 'ALL') return '전 지사'; const b = branchList.find(x => x[0] === code); return b ? b[1] : code; }
     function codeOfName(n) { const k = String(n).replace(/\s|지사/g, ''); const b = branchList.find(x => String(x[1]).replace(/\s|지사/g, '') === k); return b ? b[0] : ''; }
     /* 수리요청 연동용: 현재 화면의 지사. all=true 면 전체 지사(본사/MASTER 전체 보기) */
@@ -2663,8 +2664,9 @@ const AUTH = (function () {
                 </div>
             </div>
             <div class="bd-toolbar">
+                <select id="board-filter-branch" class="bd-in" style="width:120px;" onchange="boardPage=1; renderBoardList();"><option value="all">전체 지사</option></select>
                 <select id="board-filter-equip" class="bd-in" style="width:130px;" onchange="boardPage=1; renderBoardList();"></select>
-                <input id="board-search" class="bd-in" style="flex:1; min-width:140px;" type="text" placeholder="차량번호, 제목, 업체 검색" oninput="boardPage=1; renderBoardList();">
+                <input id="board-search" class="bd-in" style="flex:1; min-width:140px;" type="text" placeholder="차량번호, 제목, 업체, 지사 검색" oninput="boardPage=1; renderBoardList();">
                 <select id="board-filter-period" class="bd-in" style="width:120px;" onchange="boardPage=1; renderBoardList();">
                     <option value="all">전체 기간</option>
                     <option value="1">최근 1개월</option>
@@ -2684,6 +2686,7 @@ const AUTH = (function () {
             </div>
             <div class="bd-form-grid">
                 <div class="bd-col">
+                    <div><label class="bd-lb">지사 <span class="bd-req">*</span> <span style="font-weight:400;color:#8a95a3;">(전 지사 공통 자료는 '전사공통')</span></label><select id="board-f-branch" class="bd-in" onchange="onBoardBranchChange()"></select></div>
                     <div class="bd-row2">
                         <div><label class="bd-lb">기종 <span class="bd-req">*</span></label><select id="board-f-equip" class="bd-in" onchange="onBoardEquipChange()"></select></div>
                         <div><label class="bd-lb">차량번호 <span class="bd-req">*</span></label><input id="board-f-num" class="bd-in" type="text" list="board-num-list" placeholder="예: 6664" autocomplete="off"><datalist id="board-num-list"></datalist></div>
@@ -6544,6 +6547,7 @@ const AUTH = (function () {
             const au = String((window.__authUrl && window.__authUrl()) || '').split('?')[0];
             if (au && url.indexOf(au) === 0) return ['mdPost', 'mdImport', 'mdCopy', 'upload', 'permSave'].indexOf(body.action) >= 0;
             if (body && body.message !== undefined && body.rows === undefined) return false;   // 챗봇 질문은 허용
+            try { if (typeof BOARD_GAS_URL === 'string' && BOARD_GAS_URL && url.indexOf(BOARD_GAS_URL.split('?')[0]) === 0) return false; } catch (e) {}   // 게시판은 본사도 등록·삭제 가능
             return true;
         } catch (e) { return false; }
     };
@@ -8849,7 +8853,19 @@ function boardEquipTypes() {
     return Array.from(set);
 }
 
+const BOARD_COMMON = { code: '00', name: '전사공통' };
+function boardBranchOptions() {
+    const list = (window.__branchNames ? window.__branchNames() : []).slice();
+    return [BOARD_COMMON].concat(list.filter(b => b.code !== BOARD_COMMON.code));
+}
 function buildBoardFilterOptions() {
+    const bsel = bdEl('board-filter-branch');
+    if (bsel) {
+        const prevB = bsel.value || 'all';
+        const opts = boardBranchOptions();
+        bsel.innerHTML = '<option value="all">전체 지사</option>' + opts.map(b => `<option value="${bdEsc(b.code)}">${bdEsc(b.name)}</option>`).join('');
+        bsel.value = (prevB === 'all' || opts.some(b => b.code === prevB)) ? prevB : 'all';
+    }
     const sel = bdEl('board-filter-equip');
     if (!sel) return;
     const prev = sel.value || 'all';
@@ -8888,7 +8904,7 @@ let boardBranchKey = '';
 function boardBranch() { try { return window.repairBranchInfo ? window.repairBranchInfo() : { code: '', name: '전북', all: false }; } catch (e) { return { code: '', name: '전북', all: false }; } }
 async function loadBoardData(force) {
     const body = bdEl('board-list-body');
-    { const bb = boardBranch(), key = bb.all ? 'all' : bb.code; if (key !== boardBranchKey) { boardBranchKey = key; isBoardLoaded = false; boardData = []; } }
+    boardBranchKey = 'all';   // 게시판은 전 지사 공통: 항상 전체 자료를 불러옴
     buildBoardFilterOptions();
     renderBoardChips();
     if (isBoardLoaded && !force) { renderBoardList(); return; }
@@ -8901,8 +8917,7 @@ async function loadBoardData(force) {
     if (body && !background) body.innerHTML = '<div class="bd-empty">불러오는 중...</div>';
     try {
         const sep = BOARD_GAS_URL.includes('?') ? '&' : '?';
-        const bb = boardBranch();
-        const res = await fetch(`${BOARD_GAS_URL}${sep}branch=${encodeURIComponent(bb.all ? 'all' : (bb.code || bb.name))}&_ts=${Date.now()}`, { cache: 'no-store' });
+        const res = await fetch(`${BOARD_GAS_URL}${sep}branch=all&_ts=${Date.now()}`, { cache: 'no-store' });
         const data = await res.json();
         if (data && data.result === 'error') throw new Error(data.message || '서버 오류');
         const rows = Array.isArray(data) ? data : (data.rows || []);
@@ -8917,13 +8932,26 @@ async function loadBoardData(force) {
     renderBoardList();
 }
 
+// 삭제: 등록한 지사 사용자, 본사·MASTER 의 관리자 이상만 (다른 지사 자료는 지우지 못함)
+function boardCanDelete(r) {
+    try {
+        const S = window.SEBANG_SESSION; if (!S || !S.user) return true;
+        const u = S.user;
+        if (u.isMaster) return true;
+        if (u.isHQ) return u.role === '관리자';
+        return String(r.branchCode || '') === String(u.branchCode || '');
+    } catch (e) { return true; }
+}
+function boardRowBranch(r) { return String(r.branchName || '').replace(/지사$/, '') || '-'; }
 function getBoardFiltered() {
     const eq = bdEl('board-filter-equip').value || 'all';
     const q = bdEl('board-search').value.trim().toLowerCase();
     const per = bdEl('board-filter-period').value;
     let cutoff = null;
     if (per !== 'all') { cutoff = new Date(); cutoff.setMonth(cutoff.getMonth() - parseInt(per, 10)); }
+    const brSel = bdEl('board-filter-branch') ? bdEl('board-filter-branch').value : 'all';
     return boardData.filter(r => {
+        if (brSel !== 'all' && String(r.branchCode || '') !== brSel) return false;
         if (eq !== 'all' && r.equipType !== eq) return false;
         if (boardCategory !== 'all' && r.category !== boardCategory) return false;
         if (cutoff) {
@@ -8931,7 +8959,7 @@ function getBoardFiltered() {
             if (isNaN(d.getTime()) || d < cutoff) return false;
         }
         if (q) {
-            const hay = [r.equipType, r.equipNum, r.title, r.vendor, r.memo].join(' ').toLowerCase();
+            const hay = [r.branchName, r.equipType, r.equipNum, r.title, r.vendor, r.memo].join(' ').toLowerCase();
             if (hay.indexOf(q) < 0) return false;
         }
         return true;
@@ -8962,11 +8990,12 @@ function renderBoardList() {
     const slice = rows.slice((boardPage - 1) * BOARD_PAGE_SIZE, boardPage * BOARD_PAGE_SIZE);
     body.innerHTML = `
         <table class="bd-table">
-            <colgroup><col class="bd-hide-m" style="width:46px"><col class="bd-hide-m" style="width:96px"><col style="width:96px"><col><col class="bd-hide-m" style="width:96px"><col style="width:52px"><col style="width:110px"></colgroup>
-            <thead><tr><th class="bd-hide-m">번호</th><th class="bd-hide-m">기종</th><th>차량번호</th><th>제목</th><th class="bd-hide-m">분류</th><th>첨부</th><th>등록일</th></tr></thead>
+            <colgroup><col class="bd-hide-m" style="width:46px"><col style="width:72px"><col class="bd-hide-m" style="width:96px"><col style="width:96px"><col><col class="bd-hide-m" style="width:96px"><col style="width:52px"><col style="width:110px"></colgroup>
+            <thead><tr><th class="bd-hide-m">번호</th><th>지사</th><th class="bd-hide-m">기종</th><th>차량번호</th><th>제목</th><th class="bd-hide-m">분류</th><th>첨부</th><th>등록일</th></tr></thead>
             <tbody>${slice.map(r => `
                 <tr onclick="openBoardDetail('${bdEsc(r.id)}')">
                     <td class="bd-hide-m">${noMap[r.id] || ''}</td>
+                    <td>${bdEsc(boardRowBranch(r))}</td>
                     <td class="bd-hide-m">${bdEsc(r.equipType)}</td>
                     <td>${bdEsc(r.equipNum)}</td>
                     <td title="${bdEsc(r.title)}">${bdEsc(r.title)}</td>
@@ -8999,21 +9028,61 @@ function openBoardForm() {
         return;
     }
     boardPending = [];
-    const types = boardEquipTypes();
-    bdEl('board-f-equip').innerHTML = types.map(t => `<option value="${bdEsc(t)}">${bdEsc(t)}</option>`).join('');
+    {
+        const opts = boardBranchOptions();
+        const me = boardBranch();
+        bdEl('board-f-branch').innerHTML = opts.map(b => `<option value="${bdEsc(b.code)}">${bdEsc(b.name)}</option>`).join('');
+        bdEl('board-f-branch').value = opts.some(b => b.code === me.code) ? me.code : BOARD_COMMON.code;   // 기본값: 내 지사 (본사·MASTER 는 선택한 지사)
+    }
+    bdEl('board-f-equip').innerHTML = '<option value="공통">공통</option>';
     bdEl('board-f-cat').innerHTML = BOARD_CATEGORIES.map(c => `<option value="${c}">${c}</option>`).join('');
     bdEl('board-f-num').value = '';
     bdEl('board-f-title').value = '';
     bdEl('board-f-date').value = bdToday();
     bdEl('board-f-vendor').value = '';
     bdEl('board-f-memo').value = '';
-    onBoardEquipChange();
+    onBoardBranchChange();
     renderBoardPending();
     showBoardPanel('form');
 }
+// 선택한 지사의 기종/차량번호 목록 (로그인 서버 mdPublic, 지사별로 한 번만 불러옴)
+const boardEquipCache = {};
+async function boardLoadEquip(code) {
+    if (code === BOARD_COMMON.code) {
+        // 전사공통: 모든 지사 기종을 합쳐서 제시
+        if (!boardEquipCache[code]) {
+            const merged = {};
+            const brs = (window.__branchNames ? window.__branchNames() : []);
+            await Promise.all(brs.map(b => boardLoadEquip(b.code).then(d => { Object.keys(d || {}).forEach(t => { merged[t] = Array.from(new Set((merged[t] || []).concat(d[t]))); }); })));
+            boardEquipCache[code] = merged;
+        }
+        return boardEquipCache[code];
+    }
+    if (boardEquipCache[code]) return boardEquipCache[code];
+    let data = null;
+    try {
+        const r = await fetch(window.__authUrl(), { method: 'POST', body: JSON.stringify({ action: 'mdPublic', branch: code }) });
+        const j = await r.json();
+        if (j && j.ok && j.equipData) data = j.equipData;
+    } catch (e) {}
+    if (!data) data = {};
+    boardEquipCache[code] = data;
+    return data;
+}
+async function onBoardBranchChange() {
+    const code = bdEl('board-f-branch').value;
+    const sel = bdEl('board-f-equip');
+    sel.innerHTML = '<option value="공통">공통</option>';
+    const data = await boardLoadEquip(code);
+    if (bdEl('board-f-branch').value !== code) return;   // 그 사이 다른 지사로 바뀌었으면 무시
+    const types = Object.keys(data || {}).sort((a, b) => a.localeCompare(b, 'ko'));
+    sel.innerHTML = '<option value="공통">공통</option>' + types.map(t => `<option value="${bdEsc(t)}">${bdEsc(t)}</option>`).join('');
+    onBoardEquipChange();
+}
 function onBoardEquipChange() {
     const t = bdEl('board-f-equip').value;
-    const list = (typeof EQUIP_DATA === 'object' && EQUIP_DATA && EQUIP_DATA[t]) || [];
+    const data = boardEquipCache[bdEl('board-f-branch').value] || {};
+    const list = (data && data[t]) || [];
     bdEl('board-num-list').innerHTML = list.map(n => `<option value="${bdEsc(n)}"></option>`).join('');
 }
 
@@ -9093,7 +9162,8 @@ async function submitBoardForm() {
     const docDate = bdEl('board-f-date').value;
     const vendor = bdEl('board-f-vendor').value.trim();
     const memo = bdEl('board-f-memo').value.trim();
-    if (!equipType || !equipNum || !title || !category) { alert('기종, 차량번호, 제목, 분류를 입력해 주세요.'); return; }
+    if (!bdEl('board-f-branch').value) { alert('지사를 선택해 주세요.'); return; }
+    if (!equipType || !equipNum || !title || !category) { alert('기종, 차량번호, 제목, 분류를 입력해 주세요. (전 지사 공통 자료는 기종·차량번호에 "공통"으로 적어도 됩니다)'); return; }
     if (!boardPending.length) { alert('첨부할 파일을 1개 이상 선택해 주세요.'); return; }
     if (!boardConfigured()) { alert('먼저 설정(톱니) 버튼에서 구글시트 연동 주소를 입력해 주세요.'); return; }
 
@@ -9105,14 +9175,15 @@ async function submitBoardForm() {
     try {
         const files = [];
         for (const p of boardPending) files.push(await bdPrepareFile(p.file));
-        const bbw = boardBranch();
-        const payload = { action: 'create', branchCode: bbw.code, branchName: bbw.name, equipType, equipNum, title, category, docDate, vendor, memo, createdAt: new Date().toISOString(), files };
+        const bsel = bdEl('board-f-branch');
+        const bopt = boardBranchOptions().filter(b => b.code === bsel.value)[0] || BOARD_COMMON;
+        const payload = { action: 'create', branchCode: bopt.code, branchName: bopt.name, equipType, equipNum, title, category, docDate, vendor, memo, createdAt: new Date().toISOString(), files };
         const res = await fetch(BOARD_GAS_URL, { method: 'POST', body: JSON.stringify(payload) });
         if (!res.ok) throw new Error('서버 응답 오류 (HTTP ' + res.status + ')');
         let data = null;
         try { data = await res.json(); } catch (e) {}
         if (!data || data.result !== 'success') throw new Error((data && data.message) || '서버에서 저장 결과를 확인하지 못했습니다.');
-        boardData.unshift(normalizeBoardRow({ id: data.id, equipType, equipNum, title, category, docDate, vendor, memo, createdAt: payload.createdAt, files: data.files || [] }));
+        boardData.unshift(normalizeBoardRow({ id: data.id, branchCode: bopt.code, branchName: bopt.name, equipType, equipNum, title, category, docDate, vendor, memo, createdAt: payload.createdAt, files: data.files || [] }));
         isBoardLoaded = true;
         showToast('자료를 등록했습니다.');
         boardPending = [];
@@ -9140,11 +9211,12 @@ function openBoardDetail(id) {
         <div class="bd-head">
             <h3>${bdEsc(r.title)}</h3>
             <div class="bd-head-btns">
-                <button type="button" class="bd-btn danger" onclick="deleteBoardItem('${bdEsc(r.id)}')"><i class="fa-solid fa-trash-can"></i> 삭제</button>
+                ${boardCanDelete(r) ? `<button type="button" class="bd-btn danger" onclick="deleteBoardItem('${bdEsc(r.id)}')"><i class="fa-solid fa-trash-can"></i> 삭제</button>` : ''}
                 <button type="button" class="bd-btn" onclick="showBoardPanel('list')"><i class="fa-solid fa-list"></i> 목록</button>
             </div>
         </div>
         <dl class="bd-meta">
+            <dt>지사</dt><dd>${bdEsc(r.branchName || '-')}</dd>
             <dt>기종</dt><dd>${bdEsc(r.equipType)}</dd>
             <dt>차량번호</dt><dd>${bdEsc(r.equipNum)}</dd>
             <dt>분류</dt><dd><span class="bd-tag ${boardTagClass(r.category)}">${bdEsc(r.category)}</span></dd>
@@ -9201,7 +9273,7 @@ async function deleteBoardItem(id) {
     if (!r) return;
     if (!confirm('이 자료를 삭제할까요?\n\n' + r.title + '\n(첨부 파일은 드라이브 휴지통으로 이동합니다)')) return;
     try {
-        const res = await fetch(BOARD_GAS_URL, { method: 'POST', body: JSON.stringify({ action: 'delete', id: r.id, branchCode: boardBranch().code }) });
+        const res = await fetch(BOARD_GAS_URL, { method: 'POST', body: JSON.stringify({ action: 'delete', id: r.id, branchCode: r.branchCode || '' }) });
         let data = null;
         try { data = await res.json(); } catch (e) {}
         if (!data || data.result !== 'success') throw new Error((data && data.message) || '삭제 결과를 확인하지 못했습니다.');
