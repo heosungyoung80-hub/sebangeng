@@ -2665,6 +2665,7 @@ const AUTH = (function () {
             </div>
             <div class="bd-toolbar">
                 <select id="board-filter-branch" class="bd-in" style="width:120px;" onchange="boardPage=1; renderBoardList();"><option value="all">전체 지사</option></select>
+                <select id="board-filter-cat" class="bd-in" style="width:120px;" onchange="setBoardCategory(this.value)"></select>
                 <select id="board-filter-equip" class="bd-in" style="width:130px;" onchange="boardPage=1; renderBoardList();"></select>
                 <input id="board-search" class="bd-in" style="flex:1; min-width:140px;" type="text" placeholder="차량번호, 제목, 업체, 지사 검색" oninput="boardPage=1; renderBoardList();">
                 <select id="board-filter-period" class="bd-in" style="width:120px;" onchange="boardPage=1; renderBoardList();">
@@ -8879,6 +8880,11 @@ function renderBoardChips() {
     if (!wrap) return;
     const items = ['all'].concat(BOARD_CATEGORIES);
     wrap.innerHTML = items.map(c => `<button type="button" class="bd-chip${boardCategory === c ? ' on' : ''}" onclick="setBoardCategory('${c}')">${c === 'all' ? '전체' : c}</button>`).join('');
+    const cs = bdEl('board-filter-cat');   // 분류 콤보 (위 버튼과 같은 값을 공유)
+    if (cs) {
+        cs.innerHTML = '<option value="all">전체 분류</option>' + BOARD_CATEGORIES.map(c => `<option value="${c}">${c}</option>`).join('');
+        cs.value = boardCategory;
+    }
 }
 function setBoardCategory(c) {
     boardCategory = c;
