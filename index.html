@@ -8988,7 +8988,7 @@ function getBoardFiltered() {
             if (isNaN(d.getTime()) || d < cutoff) return false;
         }
         if (q) {
-            const hay = [r.branchName, r.equipType, r.equipNum, r.title, r.vendor, r.memo].join(' ').toLowerCase();
+            const hay = [r.branchName, r.equipType, r.equipNum, r.title, r.vendor, r.memo, r.author].join(' ').toLowerCase();
             if (hay.indexOf(q) < 0) return false;
         }
         return true;
@@ -9019,8 +9019,8 @@ function renderBoardList() {
     const slice = rows.slice((boardPage - 1) * BOARD_PAGE_SIZE, boardPage * BOARD_PAGE_SIZE);
     body.innerHTML = `
         <table class="bd-table">
-            <colgroup><col class="bd-hide-m" style="width:46px"><col style="width:72px"><col class="bd-hide-m" style="width:96px"><col style="width:96px"><col><col class="bd-hide-m" style="width:96px"><col style="width:52px"><col style="width:110px"></colgroup>
-            <thead><tr><th class="bd-hide-m">번호</th><th>지사</th><th class="bd-hide-m">기종</th><th>차량번호</th><th>제목</th><th class="bd-hide-m">분류</th><th>첨부</th><th>등록일</th></tr></thead>
+            <colgroup><col class="bd-hide-m" style="width:46px"><col style="width:72px"><col class="bd-hide-m" style="width:96px"><col style="width:96px"><col><col class="bd-hide-m" style="width:96px"><col style="width:52px"><col class="bd-hide-m" style="width:80px"><col style="width:110px"></colgroup>
+            <thead><tr><th class="bd-hide-m">번호</th><th>지사</th><th class="bd-hide-m">기종</th><th>차량번호</th><th>제목</th><th class="bd-hide-m">분류</th><th>첨부</th><th class="bd-hide-m">등록자</th><th>등록일</th></tr></thead>
             <tbody>${slice.map(r => `
                 <tr onclick="openBoardDetail('${bdEsc(r.id)}')">
                     <td class="bd-hide-m">${noMap[r.id] || ''}</td>
@@ -9030,6 +9030,7 @@ function renderBoardList() {
                     <td title="${bdEsc(r.title)}">${bdEsc(r.title)}</td>
                     <td class="bd-hide-m"><span class="bd-tag ${boardTagClass(r.category)}">${bdEsc(r.category)}</span></td>
                     <td><i class="fa-solid fa-paperclip" style="font-size:11px; color:#8a95a3;"></i> ${(r.files || []).length}</td>
+                    <td class="bd-hide-m">${bdEsc(r.author) || '-'}</td>
                     <td>${bdEsc(String(r.createdAt || r.docDate || '').substring(0, 10))}</td>
                 </tr>`).join('')}
             </tbody>
@@ -9251,7 +9252,7 @@ async function submitBoardForm() {
             if (!ud || ud.result !== 'success') throw new Error((ud && ud.message) || '서버에서 수정 결과를 확인하지 못했습니다.');
             const idx = boardData.findIndex(x => String(x.id) === String(boardEditId));
             const prev = idx >= 0 ? boardData[idx] : {};
-            const nr = normalizeBoardRow({ id: boardEditId, branchCode: bopt.code, branchName: bopt.name, equipType, equipNum, title, category, docDate, vendor, memo, createdAt: prev.createdAt, files: ud.files || [] });
+            const nr = normalizeBoardRow({ id: boardEditId, branchCode: bopt.code, branchName: bopt.name, equipType, equipNum, title, category, docDate, vendor, memo, createdAt: prev.createdAt, author: prev.author || '', authorId: prev.authorId || '', files: ud.files || [] });
             if (idx >= 0) boardData[idx] = nr; else boardData.unshift(nr);
             Object.keys(boardThumbCache).forEach(k => delete boardThumbCache[k]);
             showToast('수정했습니다.');
@@ -9261,13 +9262,14 @@ async function submitBoardForm() {
             openBoardDetail(nr.id);
             return;
         }
-        const payload = { action: 'create', branchCode: bopt.code, branchName: bopt.name, equipType, equipNum, title, category, docDate, vendor, memo, createdAt: new Date().toISOString(), files };
+        const me = (window.SEBANG_SESSION && window.SEBANG_SESSION.user) || {};
+        const payload = { action: 'create', author: me.name || '', authorId: me.empNo || '', branchCode: bopt.code, branchName: bopt.name, equipType, equipNum, title, category, docDate, vendor, memo, createdAt: new Date().toISOString(), files };
         const res = await fetch(BOARD_GAS_URL, { method: 'POST', body: JSON.stringify(payload) });
         if (!res.ok) throw new Error('서버 응답 오류 (HTTP ' + res.status + ')');
         let data = null;
         try { data = await res.json(); } catch (e) {}
         if (!data || data.result !== 'success') throw new Error((data && data.message) || '서버에서 저장 결과를 확인하지 못했습니다.');
-        boardData.unshift(normalizeBoardRow({ id: data.id, branchCode: bopt.code, branchName: bopt.name, equipType, equipNum, title, category, docDate, vendor, memo, createdAt: payload.createdAt, files: data.files || [] }));
+        boardData.unshift(normalizeBoardRow({ id: data.id, branchCode: bopt.code, branchName: bopt.name, equipType, equipNum, title, category, docDate, vendor, memo, createdAt: payload.createdAt, author: me.name || '', authorId: me.empNo || '', files: data.files || [] }));
         isBoardLoaded = true;
         showToast('자료를 등록했습니다.');
         boardPending = [];
@@ -9311,6 +9313,7 @@ function openBoardDetail(id) {
             <dt>분류</dt><dd><span class="bd-tag ${boardTagClass(r.category)}">${bdEsc(r.category)}</span></dd>
             <dt>자료 일자</dt><dd>${bdEsc(String(r.docDate || '').substring(0, 10)) || '-'}</dd>
             <dt>정비 업체</dt><dd>${bdEsc(r.vendor) || '-'}</dd>
+            <dt>등록자</dt><dd>${bdEsc(r.author) || '-'}</dd>
             <dt>등록일</dt><dd>${bdEsc(String(r.createdAt || '').substring(0, 10)) || '-'}</dd>
             <dt>내용·메모</dt><dd style="white-space:pre-wrap;">${bdEsc(r.memo) || '-'}</dd>
         </dl>
