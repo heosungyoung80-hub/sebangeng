@@ -2689,7 +2689,7 @@ const AUTH = (function () {
 
         <div id="board-form-panel" class="bd-card" style="display:none;">
             <div class="bd-head">
-                <h3>정비 자료 등록</h3>
+                <h3 id="board-form-title">정비 자료 등록</h3>
                 <button type="button" class="bd-btn" onclick="showBoardPanel('list')"><i class="fa-solid fa-list"></i> 목록</button>
             </div>
             <div class="bd-form-grid">
@@ -8798,6 +8798,8 @@ let boardData = [];
 let isBoardLoaded = false;
 let boardCategory = 'all';
 let boardPage = 1;
+let boardEditId = null;   // 수정 중인 글 id (null이면 신규 등록)
+let boardKeep = [];       // 수정 시 유지할 기존 첨부파일
 let boardPending = [];   // 등록 화면에서 선택한 파일 (저장 전까지만 유지)
 let boardSubmitting = false;
 
@@ -8962,6 +8964,9 @@ function boardCanDelete(r) {
         return String(r.branchCode || '') === String(u.branchCode || '');
     } catch (e) { return true; }
 }
+function boardCanEdit() {   // 수정은 MASTER 담당자만
+    try { const S = window.SEBANG_SESSION; return !!(S && S.user && S.user.isMaster); } catch (e) { return false; }
+}
 function boardRowBranch(r) { return String(r.branchName || '').replace(/지사$/, '') || '-'; }
 function getBoardFiltered() {
     const eq = bdEl('board-filter-equip').value || 'all';
@@ -9048,6 +9053,9 @@ function openBoardForm() {
         return;
     }
     boardPending = [];
+    boardEditId = null; boardKeep = [];
+    bdEl('board-form-title').textContent = '정비 자료 등록';
+    bdEl('board-submit-btn').innerHTML = '<i class="fa-solid fa-check"></i> 등록';
     {
         const opts = boardBranchOptions();
         const me = boardBranch();
@@ -9065,6 +9073,32 @@ function openBoardForm() {
     renderBoardPending();
     showBoardPanel('form');
 }
+async function openBoardEdit(id) {
+    if (!boardCanEdit()) { showToast('수정은 MASTER 담당자만 가능합니다.', true); return; }
+    const r = boardData.find(x => String(x.id) === String(id));
+    if (!r) return;
+    openBoardForm();
+    boardEditId = r.id;
+    boardKeep = (r.files || []).slice();
+    bdEl('board-form-title').textContent = '정비 자료 수정';
+    bdEl('board-submit-btn').innerHTML = '<i class="fa-solid fa-check"></i> 수정 저장';
+    const bsel = bdEl('board-f-branch');
+    if (!Array.from(bsel.options).some(o => o.value === String(r.branchCode))) bsel.insertAdjacentHTML('beforeend', `<option value="${bdEsc(r.branchCode)}">${bdEsc(r.branchName)}</option>`);
+    bsel.value = String(r.branchCode || BOARD_COMMON.code);
+    await onBoardBranchChange();
+    const esel = bdEl('board-f-equip');
+    if (r.equipType && !Array.from(esel.options).some(o => o.value === r.equipType)) esel.insertAdjacentHTML('beforeend', `<option value="${bdEsc(r.equipType)}">${bdEsc(r.equipType)}</option>`);
+    esel.value = r.equipType || '공통';
+    onBoardEquipChange();
+    bdEl('board-f-num').value = r.equipNum || '';
+    bdEl('board-f-title').value = r.title || '';
+    bdEl('board-f-cat').value = r.category || BOARD_CATEGORIES[0];
+    bdEl('board-f-date').value = String(r.docDate || '').substring(0, 10);
+    bdEl('board-f-vendor').value = r.vendor || '';
+    bdEl('board-f-memo').value = r.memo || '';
+    renderBoardPending();
+}
+function removeBoardKeep(i) { boardKeep.splice(i, 1); renderBoardPending(); }
 // 선택한 지사의 기종/차량번호 목록 (로그인 서버 mdPublic, 지사별로 한 번만 불러옴)
 const boardEquipCache = {};
 async function boardLoadEquip(code) {
@@ -9110,7 +9144,7 @@ function onBoardFilesPicked(fileList) {
     const files = Array.from(fileList || []);
     let rejected = [];
     files.forEach(f => {
-        if (boardPending.length >= BOARD_MAX_FILES) { rejected.push(f.name + ' (최대 ' + BOARD_MAX_FILES + '개)'); return; }
+        if (boardPending.length + boardKeep.length >= BOARD_MAX_FILES) { rejected.push(f.name + ' (최대 ' + BOARD_MAX_FILES + '개)'); return; }
         if (f.size > BOARD_MAX_FILE_BYTES) { rejected.push(f.name + ' (10MB 초과)'); return; }
         if (boardPending.some(p => p.file.name === f.name && p.file.size === f.size)) return;
         boardPending.push({ file: f });
@@ -9131,7 +9165,13 @@ function removeBoardPending(i) {
 function renderBoardPending() {
     const wrap = bdEl('board-pending-files');
     if (!wrap) return;
-    wrap.innerHTML = boardPending.map((p, i) => `
+    const keepHtml = boardKeep.map((f, i) => `
+        <div class="bd-file">${bdFileIcon(f.name)}
+            <div class="nm" title="${bdEsc(f.name)}">${bdEsc(f.name)}</div>
+            <span class="sz">기존 · ${bdFmtSize(f.size)}</span>
+            <button type="button" class="x" title="이 파일 삭제" onclick="removeBoardKeep(${i})"><i class="fa-solid fa-xmark"></i></button>
+        </div>`).join('');
+    wrap.innerHTML = keepHtml + boardPending.map((p, i) => `
         <div class="bd-file">${bdFileIcon(p.file.name)}
             <div class="nm" title="${bdEsc(p.file.name)}">${bdEsc(p.file.name)}</div>
             <span class="sz">${bdFmtSize(p.file.size)}</span>
@@ -9184,19 +9224,39 @@ async function submitBoardForm() {
     const memo = bdEl('board-f-memo').value.trim();
     if (!bdEl('board-f-branch').value) { alert('지사를 선택해 주세요.'); return; }
     if (!equipType || !equipNum || !title || !category) { alert('기종, 차량번호, 제목, 분류를 입력해 주세요. (전 지사 공통 자료는 기종·차량번호에 "공통"으로 적어도 됩니다)'); return; }
-    if (!boardPending.length) { alert('첨부할 파일을 1개 이상 선택해 주세요.'); return; }
+    if (!boardPending.length && !boardKeep.length) { alert('첨부할 파일을 1개 이상 선택해 주세요.'); return; }
+    if (boardEditId && !boardCanEdit()) { alert('수정은 MASTER 담당자만 가능합니다.'); return; }
     if (!boardConfigured()) { alert('먼저 설정(톱니) 버튼에서 구글시트 연동 주소를 입력해 주세요.'); return; }
 
     const btn = bdEl('board-submit-btn');
     const orig = btn.innerHTML;
     boardSubmitting = true;
     btn.disabled = true;
-    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> 업로드 중...';
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> ' + (boardEditId ? '저장 중...' : '업로드 중...');
     try {
         const files = [];
         for (const p of boardPending) files.push(await bdPrepareFile(p.file));
         const bsel = bdEl('board-f-branch');
         const bopt = boardBranchOptions().filter(b => b.code === bsel.value)[0] || BOARD_COMMON;
+        if (boardEditId) {
+            const upd = { action: 'update', id: boardEditId, branchCode: bopt.code, branchName: bopt.name, equipType, equipNum, title, category, docDate, vendor, memo, keepIds: boardKeep.map(f => f.fileId), files };
+            const ures = await fetch(BOARD_GAS_URL, { method: 'POST', body: JSON.stringify(upd) });
+            if (!ures.ok) throw new Error('서버 응답 오류 (HTTP ' + ures.status + ')');
+            let ud = null;
+            try { ud = await ures.json(); } catch (e) {}
+            if (!ud || ud.result !== 'success') throw new Error((ud && ud.message) || '서버에서 수정 결과를 확인하지 못했습니다.');
+            const idx = boardData.findIndex(x => String(x.id) === String(boardEditId));
+            const prev = idx >= 0 ? boardData[idx] : {};
+            const nr = normalizeBoardRow({ id: boardEditId, branchCode: bopt.code, branchName: bopt.name, equipType, equipNum, title, category, docDate, vendor, memo, createdAt: prev.createdAt, files: ud.files || [] });
+            if (idx >= 0) boardData[idx] = nr; else boardData.unshift(nr);
+            Object.keys(boardThumbCache).forEach(k => delete boardThumbCache[k]);
+            showToast('수정했습니다.');
+            boardPending = []; boardKeep = []; boardEditId = null;
+            buildBoardFilterOptions();
+            renderBoardList();
+            openBoardDetail(nr.id);
+            return;
+        }
         const payload = { action: 'create', branchCode: bopt.code, branchName: bopt.name, equipType, equipNum, title, category, docDate, vendor, memo, createdAt: new Date().toISOString(), files };
         const res = await fetch(BOARD_GAS_URL, { method: 'POST', body: JSON.stringify(payload) });
         if (!res.ok) throw new Error('서버 응답 오류 (HTTP ' + res.status + ')');
@@ -9231,6 +9291,7 @@ function openBoardDetail(id) {
         <div class="bd-head">
             <h3>${bdEsc(r.title)}</h3>
             <div class="bd-head-btns">
+                ${boardCanEdit() ? `<button type="button" class="bd-btn" onclick="openBoardEdit('${bdEsc(r.id)}')"><i class="fa-solid fa-pen"></i> 수정</button>` : ''}
                 ${boardCanDelete(r) ? `<button type="button" class="bd-btn danger" onclick="deleteBoardItem('${bdEsc(r.id)}')"><i class="fa-solid fa-trash-can"></i> 삭제</button>` : ''}
                 <button type="button" class="bd-btn" onclick="showBoardPanel('list')"><i class="fa-solid fa-list"></i> 목록</button>
             </div>
