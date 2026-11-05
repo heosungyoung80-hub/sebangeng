@@ -940,6 +940,13 @@
         .bd-file .sz { font-size: 11px; color: #8a95a3; }
         .bd-file .x { border: none; background: none; color: #8a95a3; cursor: pointer; font-size: 14px; padding: 2px 4px; }
         .bd-foot { display: flex; justify-content: flex-end; gap: 8px; margin-top: 18px; padding-top: 12px; border-top: 1px solid #eef0f2; }
+.bd-prev{margin:10px 0 14px;}
+.bd-prev-img{display:flex;align-items:center;justify-content:center;min-height:120px;max-height:560px;background:#f1f5f9;border:1px solid #e2e8f0;border-radius:12px;overflow:hidden;}
+.bd-prev-img img{max-width:100%;max-height:560px;object-fit:contain;cursor:pointer;display:block;}
+.bd-prev-msg{color:#64748b;font-size:13px;padding:24px;}
+.bd-prev-tabs{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap;}
+.bd-prev-tabs .bd-btn.on{background:#1e293b;color:#fff;}
+
         .bd-meta { display: grid; grid-template-columns: 110px 1fr; gap: 8px 12px; font-size: 13px; margin: 6px 0 16px; }
         .bd-meta dt { color: #5b6b82; font-weight: 700; }
         .bd-meta dd { margin: 0; color: #222; word-break: break-all; }
@@ -9221,6 +9228,10 @@ function openBoardDetail(id) {
                 <button type="button" class="bd-btn" onclick="showBoardPanel('list')"><i class="fa-solid fa-list"></i> 목록</button>
             </div>
         </div>
+        ${files.length ? `<div class="bd-prev" id="bd-prev-box">
+            <div class="bd-prev-img" id="bd-prev-img"><span class="bd-prev-msg"><i class="fa-solid fa-spinner fa-spin"></i> 미리보기 불러오는 중...</span></div>
+            ${files.length > 1 ? `<div class="bd-prev-tabs">${files.map((f, i) => `<button type="button" class="bd-btn" id="bd-prev-tab-${i}" onclick="loadBoardPreview('${bdEsc(r.id)}', ${i})">${i + 1}</button>`).join('')}</div>` : ''}
+        </div>` : ''}
         <dl class="bd-meta">
             <dt>지사</dt><dd>${bdEsc(r.branchName || '-')}</dd>
             <dt>기종</dt><dd>${bdEsc(r.equipType)}</dd>
@@ -9241,6 +9252,34 @@ function openBoardDetail(id) {
             </div>`).join('') || '<div class="bd-empty" style="padding:14px;">첨부된 파일이 없습니다.</div>'}
         </div>`;
     showBoardPanel('detail');
+    if (files.length) loadBoardPreview(r.id, 0);
+}
+
+const boardThumbCache = {};
+async function loadBoardPreview(rowId, idx) {
+    const r = boardData.find(x => String(x.id) === String(rowId));
+    const f = r && r.files && r.files[idx];
+    const box = bdEl('bd-prev-img');
+    if (!f || !f.fileId || !box) return;
+    document.querySelectorAll('#bd-prev-box .bd-prev-tabs .bd-btn').forEach((b, i) => b.classList.toggle('on', i === idx));
+    const msg = t => { box.innerHTML = `<span class="bd-prev-msg">${t}</span>`; };
+    const show = url => {
+        box.innerHTML = `<img src="${url}" alt="첫 페이지 미리보기" title="${bdEsc(f.name)}">`;
+        box.querySelector('img').onclick = () => openBoardFile(rowId, idx, ['pdf','jpg','jpeg','png','gif','webp','txt'].includes(bdFileExt(f.name)) ? 'open' : 'download');
+    };
+    if (boardThumbCache[f.fileId]) { show(boardThumbCache[f.fileId]); return; }
+    msg('<i class="fa-solid fa-spinner fa-spin"></i> 미리보기 불러오는 중...');
+    try {
+        const sep = BOARD_GAS_URL.includes('?') ? '&' : '?';
+        const res = await fetch(`${BOARD_GAS_URL}${sep}thumbId=${encodeURIComponent(f.fileId)}`, { cache: 'no-store' });
+        const txt = (await res.text()).trim();
+        if (txt.indexOf('data:') !== 0) throw new Error(txt.slice(0, 120) || '빈 응답');
+        boardThumbCache[f.fileId] = txt;
+        // 그 사이 다른 글로 이동했으면 무시
+        if (bdEl('bd-prev-img') === box) show(txt);
+    } catch (e) {
+        if (bdEl('bd-prev-img') === box) msg('미리보기를 만들 수 없습니다 (' + bdEsc(e.message || e) + ')');
+    }
 }
 
 async function openBoardFile(rowId, idx, mode) {
