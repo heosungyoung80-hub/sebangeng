@@ -2671,7 +2671,7 @@ const AUTH = (function () {
                 </div>
             </div>
             <div class="bd-toolbar">
-                <select id="board-filter-branch" class="bd-in" style="width:120px;" onchange="boardPage=1; renderBoardList();"><option value="all">전체 지사</option></select>
+                <select id="board-filter-branch" class="bd-in" style="width:120px;" onchange="boardPage=1; buildBoardFilterOptions(); renderBoardList();"><option value="all">전체 지사</option></select>
                 <select id="board-filter-cat" class="bd-in" style="width:120px;" onchange="setBoardCategory(this.value)"></select>
                 <select id="board-filter-equip" class="bd-in" style="width:130px;" onchange="boardPage=1; renderBoardList();"></select>
                 <input id="board-search" class="bd-in" style="flex:1; min-width:140px;" type="text" placeholder="차량번호, 제목, 업체, 지사 검색" oninput="boardPage=1; renderBoardList();">
@@ -8856,9 +8856,16 @@ function showBoardPanel(which) {
 }
 
 function boardEquipTypes() {
-    const set = new Set(typeof EQUIP_DATA === 'object' && EQUIP_DATA ? Object.keys(EQUIP_DATA) : []);
-    boardData.forEach(r => { if (r.equipType) set.add(r.equipType); });
-    return Array.from(set);
+    // 선택한 지사의 게시글에 실제로 쓰인 기종만 (전체 지사면 전 지사 기종 합산)
+    const bsel = bdEl('board-filter-branch');
+    const br = bsel ? bsel.value : 'all';
+    const set = new Set();
+    boardData.forEach(r => {
+        if (!r.equipType) return;
+        if (br !== 'all' && String(r.branchCode || '') !== br) return;
+        set.add(r.equipType);
+    });
+    return Array.from(set).sort((a, b) => a.localeCompare(b, 'ko'));
 }
 
 const BOARD_COMMON = { code: '00', name: '전사공통' };
