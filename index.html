@@ -1021,10 +1021,10 @@
 .auth-btn.primary { background: #16232E; border-color: #16232E; color: #fff; }
 .auth-btn:disabled { opacity: .5; cursor: default; }
 #auth-empty-panel { position: fixed; left: 0; right: 0; bottom: 0; z-index: 60; background: #EEF0F2; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 24px; font-family: 'SEBANG','Malgun Gothic',sans-serif; }
-body.sebang-viewer #btn-tab-daily, body.sebang-viewer #btn-tab-stock,
-body.sebang-viewer .home-tile[onclick*="'daily'"], body.sebang-viewer .home-tile[onclick*="'stock'"],
+body.sebang-viewer #btn-tab-daily,
+body.sebang-viewer .home-tile[onclick*="'daily'"],
 body.sebang-viewer .home-tile[onclick*="'input'"], body.sebang-viewer #btn-tab-input { display: none !important; }
-body.auth-empty-data .view-section:not(#view-home):not(#view-repair):not(#view-input):not(#view-dashboard):not(#view-analysis):not(#view-board):not(#view-calendar):not(#view-livedash) { display: none !important; }
+body.auth-empty-data .view-section:not(#view-home):not(#view-repair):not(#view-input):not(#view-dashboard):not(#view-analysis):not(#view-board):not(#view-calendar):not(#view-livedash):not(#view-stock) { display: none !important; }
 .auth-ro button, .auth-ro input, .auth-ro [onclick] { pointer-events: none !important; opacity: .45; }
 .auth-ro-note { margin: 8px 0 12px; padding: 8px 12px; border-radius: 8px; background: #FEF3C7; color: #92400E; font-size: 12px; font-weight: 700; }
 .auth-table { width: 100%; border-collapse: collapse; font-size: 13px; }
@@ -1101,9 +1101,30 @@ body.auth-master > *:not(#auth-login-overlay):not(#auth-master-screen):not(#unif
             <div class="auth-card" id="auth-mcard-masterdata" onclick="AUTH.openCard('masterdata')"><div class="ic"><i class="fa-solid fa-database"></i></div><div><div style="font-weight:800;color:#16232E;">기준정보 관리</div><div style="font-size:12px;color:#64748b;margin-top:2px;">장비 구분·장비번호·거래처·정비 구분·불량 유형·세부 원인</div></div></div>
             <div class="auth-card" id="auth-mcard-connection" onclick="AUTH.openCard('connection')"><div class="ic"><i class="fa-solid fa-link"></i></div><div><div style="font-weight:800;color:#16232E;">연동 설정</div><div style="font-size:12px;color:#64748b;margin-top:2px;">구글시트 연동 주소 변경</div></div></div>
             <div class="auth-card" id="auth-mcard-upload" onclick="AUTH.openUpload()"><div class="ic"><i class="fa-solid fa-file-excel"></i></div><div><div style="font-weight:800;color:#16232E;">엑셀 업로드</div><div style="font-size:12px;color:#64748b;margin-top:2px;">지사코드표·사용자·장비마스터·정비데이터·가동데이터</div></div></div>
+            <div class="auth-card" id="auth-mcard-raw" onclick="AUTH.openRaw()"><div class="ic"><i class="fa-solid fa-table-list"></i></div><div><div style="font-weight:800;color:#16232E;">정비 이력(RAWDATA) 엑셀 업로드</div><div style="font-size:12px;color:#64748b;margin-top:2px;">지사별로 가지고 있는 과거 정비 데이터를 엑셀 양식으로 한꺼번에 올립니다</div></div></div>
             <div class="auth-card" id="auth-mcard-users" onclick="AUTH.openUsers()"><div class="ic"><i class="fa-solid fa-users"></i></div><div><div style="font-weight:800;color:#16232E;">사용자 관리</div><div style="font-size:12px;color:#64748b;margin-top:2px;">사용자 추가·삭제, 권한 변경, 비밀번호 초기화</div></div></div>
             <div class="auth-card" id="auth-mcard-perms" onclick="AUTH.openPerms()"><div class="ic"><i class="fa-solid fa-user-shield"></i></div><div><div style="font-weight:800;color:#16232E;">권한 설정</div><div style="font-size:12px;color:#64748b;margin-top:2px;">설정 항목별로 MASTER관리자·관리자·일반사용자 권한 체크</div></div></div>
             <div class="auth-card" id="auth-mcard-view" onclick="AUTH.viewBranch()"><div class="ic"><i class="fa-solid fa-eye"></i></div><div><div style="font-weight:800;color:#16232E;">지사 화면 보기</div><div style="font-size:12px;color:#64748b;margin-top:2px;">위에서 선택한 대상 지사의 화면을 일반 사용자처럼 둘러봅니다</div></div></div>
+        </div>
+    </div>
+</div>
+
+<div id="auth-raw-overlay" class="auth-overlay" style="z-index:3100;">
+    <div class="auth-modal" style="width:720px;max-width:94vw;max-height:92vh;overflow-y:auto;">
+        <h3 style="font-size:17px;font-weight:800;color:#16232E;margin-bottom:4px;"><i class="fa-solid fa-table-list" style="margin-right:8px;"></i>정비 이력(RAWDATA) 엑셀 업로드</h3>
+        <p style="font-size:12px;color:#64748b;margin-bottom:12px;">지사를 고르고 "RAWDATA 업로드 양식"으로 작성한 엑셀을 선택하세요. 확인 화면에서 문제 행을 점검한 뒤 [업로드]를 누르면 해당 지사 탭(RAWDATA_지사명)에 저장됩니다.</p>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px;">
+            <label style="font-size:13px;font-weight:700;color:#16232E;">대상 지사</label>
+            <select id="auth-raw-branch" style="border:1px solid #cbd5e1;border-radius:6px;padding:6px 10px;font-size:13px;"></select>
+            <button class="auth-btn" onclick="AUTH.rawTemplate()"><i class="fa-solid fa-download"></i> 빈 양식 내려받기</button>
+        </div>
+        <input type="file" id="auth-raw-file" accept=".xlsx,.xlsm" onchange="AUTH.rawOnFile(this.files[0])">
+        <div id="auth-raw-info" style="font-size:12px;color:#64748b;margin-top:8px;"></div>
+        <div id="auth-raw-preview" style="margin-top:10px;font-size:12px;line-height:1.7;"></div>
+        <div id="auth-raw-log" style="font-size:12px;margin-top:10px;line-height:1.7;"></div>
+        <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:16px;">
+            <button class="auth-btn" onclick="AUTH.closeRaw()">닫기</button>
+            <button class="auth-btn primary" id="auth-raw-go" onclick="AUTH.rawGo()" disabled>업로드</button>
         </div>
     </div>
 </div>
@@ -1305,7 +1326,7 @@ const AUTH = (function () {
             ensureBranches().then(fillMasterTargets);
             if (u.isHQ) {
                 const canUsers = (u.role === 'MASTER관리자' || u.role === '관리자');
-                ['masterdata', 'connection', 'upload'].forEach(k => $('auth-mcard-' + k).classList.add('auth-hide'));
+                ['masterdata', 'connection', 'upload', 'raw'].forEach(k => $('auth-mcard-' + k).classList.add('auth-hide'));
                 $('auth-mcard-perms').classList.add('auth-hide');
                 $('auth-master-tools').classList.add('auth-hide');
                 $('auth-master-note').classList.add('auth-hide');
@@ -1315,6 +1336,7 @@ const AUTH = (function () {
                 $('auth-mcard-masterdata').classList.toggle('auth-hide', !hasMasterTab(p));
                 $('auth-mcard-connection').classList.toggle('auth-hide', !p.connection);
                 $('auth-mcard-upload').classList.toggle('auth-hide', !p.upload);
+                $('auth-mcard-raw').classList.toggle('auth-hide', !p.upload);
             }
             return;
         }
@@ -1329,7 +1351,7 @@ const AUTH = (function () {
     function applySettingsPerms() {
         // 설정 버튼과 항목은 모두 보이고, 수정 가능 여부는 각 화면을 열 때 정해진다 (조회 전용)
         const g = $('btn-global-settings'); if (g) g.classList.remove('auth-hide');
-        ['masterdata', 'connection', 'upload'].forEach(k => { const el = $('settings-item-' + k); if (el) el.classList.remove('auth-hide'); });
+        ['masterdata', 'connection', 'upload', 'raw'].forEach(k => { const el = $('settings-item-' + k); if (el) el.classList.remove('auth-hide'); });
     }
     function roNote(containerId, show) {
         const c = $(containerId); if (!c) return;
@@ -1539,6 +1561,204 @@ const AUTH = (function () {
         $('auth-up-go').disabled = false;
     }
 
+
+    /* ---------- 정비 이력(RAWDATA) 엑셀 업로드 ---------- */
+    const RAW_FIELDS = [
+        ['접수일자', ['접수일자', '일자', '날짜', '정비일자']], ['거래처', ['거래처', '업체', '업체명']], ['정비유형', ['정비유형']],
+        ['장비 구분', ['장비구분', '기종']], ['장비번호', ['장비번호', '차량번호']], ['정비 구분', ['정비구분', '수리부품']],
+        ['사용방법', ['사용방법', '비용구분']], ['규격', ['규격']], ['문제점', ['문제점', '수리내용']],
+        ['수량', ['수량']], ['부품단가', ['부품단가', '단가']], ['구매단가', ['구매단가', '합계금액', '합계']],
+        ['불량 유형', ['불량유형']], ['장비 상태', ['장비상태']], ['긴급도', ['긴급도']]
+    ];
+    const RAW_TYPES = ['계획정비', '돌발장애'];
+    const RAW_USE = ['저장품', '인건비', '소모품', '부품', '부외자산', '사내수리'];
+    const RAW_STATUS = { '운행가능': '🟢 운행가능', '제한운행': '🟡 제한운행', '운행불가': '🔴 운행불가' };
+    const RAW_URGENCY = { '긴급': '🔴 긴급', '우선': '🟠 우선', '일반': '🟡 일반', '계획': '🔵 계획' };
+    let rawState = { rows: [], code: '', name: '' };
+    function rawNorm(h) { return String(h == null ? '' : h).replace(/[\s　*()（）\[\]]|필수/g, ''); }
+    function rawP2(n) { return String(n).padStart(2, '0'); }
+    function rawYmd(y, m, d) {
+        const dt = new Date(y, m - 1, d);
+        if (dt.getFullYear() !== y || dt.getMonth() !== m - 1 || dt.getDate() !== d || y < 1990 || y > 2100) return '';
+        return y + '-' + rawP2(m) + '-' + rawP2(d);
+    }
+    function rawDate(v) {
+        if (v === '' || v == null) return '';
+        if (v instanceof Date) { const d = new Date(Math.round(v.getTime() / 60000) * 60000); return rawYmd(d.getFullYear(), d.getMonth() + 1, d.getDate()); }
+        if (typeof v === 'number') {
+            if (v >= 19900101 && v <= 21001231) return rawYmd(Math.floor(v / 10000), Math.floor(v / 100) % 100, v % 100);
+            if (v > 20000 && v < 80000 && window.XLSX && XLSX.SSF) { const o = XLSX.SSF.parse_date_code(v); return o ? rawYmd(o.y, o.m, o.d) : ''; }
+            return '';
+        }
+        const t = String(v).trim();
+        let m = t.match(/^(\d{4})[-./\s]+(\d{1,2})[-./\s]+(\d{1,2})/);
+        if (m) return rawYmd(+m[1], +m[2], +m[3]);
+        m = t.match(/^(\d{4})(\d{2})(\d{2})$/);
+        return m ? rawYmd(+m[1], +m[2], +m[3]) : '';
+    }
+    function rawNum(v) {            // '' 이면 '', 숫자 아님이면 NaN
+        if (v === '' || v == null) return '';
+        if (typeof v === 'number') return v;
+        const t = String(v).replace(/[,\s₩원]/g, '');
+        if (t === '') return '';
+        return /^-?\d+(\.\d+)?$/.test(t) ? Number(t) : NaN;
+    }
+    function rawText(v) {
+        if (v === '' || v == null) return '';
+        if (v instanceof Date) return rawDate(v);
+        if (typeof v === 'number') return Number.isInteger(v) ? String(v) : String(Math.round(v * 1e6) / 1e6);
+        return String(v).replace(/　/g, ' ').trim();
+    }
+    function rawHash(s) {
+        let h1 = 0x811c9dc5, h2 = 5381;
+        for (let i = 0; i < s.length; i++) { const c = s.charCodeAt(i); h1 ^= c; h1 = Math.imul(h1, 16777619) >>> 0; h2 = (Math.imul(h2, 33) ^ c) >>> 0; }
+        return h1.toString(16).padStart(8, '0') + h2.toString(16).padStart(8, '0');
+    }
+    // 엑셀 시트(2차원 배열)에서 머리글 행을 찾아 {rows, errors, warnings, stats} 로 변환 — 화면과 무관한 순수 함수
+    function rawBuild(aoa, branchCode) {
+        let hr = -1, map = null;
+        for (let r = 0; r < Math.min(aoa.length, 15); r++) {
+            const heads = (aoa[r] || []).map(rawNorm), m = {};
+            heads.forEach((h, c) => RAW_FIELDS.forEach(([key, al]) => { if (!(key in m) && al.includes(h)) m[key] = c; }));
+            if ('접수일자' in m && '장비 구분' in m && '장비번호' in m) { hr = r; map = m; break; }
+        }
+        if (hr < 0) return { error: '머리글을 찾지 못했습니다. "접수일자 / 장비 구분 / 장비번호" 열이 있는 RAWDATA 업로드 양식을 사용하세요.' };
+        const rows = [], errors = [], warnings = [], seen = {};
+        const st = { total: 0, examples: 0, autoCost: 0, minDate: '', maxDate: '', sum: 0, types: {} };
+        for (let i = hr + 1; i < aoa.length; i++) {
+            const line = aoa[i] || [];
+            const get = k => (k in map ? line[map[k]] : '');
+            if (!line.some(v => v !== '' && v != null)) continue;
+            if (RAW_FIELDS.some(([k]) => /^\(?\s*예시/.test(rawText(get(k))) || /\(예시/.test(rawText(get(k))))) { st.examples++; continue; }
+            st.total++;
+            const no = i + 1, row = {}, errs = [];
+            const date = rawDate(get('접수일자'));
+            if (!date) errs.push('접수일자 형식 오류(' + rawText(get('접수일자')) + ')');
+            row['접수일자'] = date;
+            ['거래처', '정비유형', '장비 구분', '장비번호', '정비 구분', '사용방법', '규격', '문제점'].forEach(k => { row[k] = rawText(get(k)); });
+            if (!row['장비 구분']) errs.push('장비 구분 없음');
+            if (!row['장비번호']) errs.push('장비번호 없음');
+            ['수량', '부품단가', '구매단가'].forEach(k => {
+                const n = rawNum(get(k));
+                if (typeof n === 'number' && isNaN(n)) errs.push(k + ' 숫자 아님(' + rawText(get(k)) + ')');
+                else if (n !== '' && n < 0) errs.push(k + ' 음수');
+                row[k] = n;
+            });
+            if (!errs.length && row['구매단가'] === '' && typeof row['수량'] === 'number' && typeof row['부품단가'] === 'number') { row['구매단가'] = Math.round(row['수량'] * row['부품단가']); st.autoCost++; }
+            const sv = rawText(get('장비 상태')), ug = rawText(get('긴급도'));
+            row['불량 유형'] = rawText(get('불량 유형'));
+            row['장비 상태'] = RAW_STATUS[sv] || sv;
+            row['긴급도'] = RAW_URGENCY[ug] || ug;
+            if (errs.length) { errors.push(no + '행: ' + errs.join(', ')); continue; }
+            if (row['정비유형'] && RAW_TYPES.indexOf(row['정비유형']) < 0) warnings.push(no + '행: 정비유형 "' + row['정비유형'] + '" (계획정비/돌발장애 아님 — 비용 집계에서 빠질 수 있음)');
+            if (row['사용방법'] && RAW_USE.indexOf(row['사용방법']) < 0) warnings.push(no + '행: 사용방법 "' + row['사용방법'] + '" (목록에 없는 값)');
+            const base = [row['접수일자'], row['거래처'], row['정비유형'], row['장비 구분'], row['장비번호'], row['정비 구분'], row['사용방법'], row['규격'], row['문제점'], row['수량'], row['부품단가'], row['구매단가']].join('|');
+            seen[base] = (seen[base] || 0) + 1;
+            row['고유번호'] = 'IMP-' + branchCode + '-' + rawHash(base) + '-' + seen[base];   // 같은 내용을 다시 올려도 중복 저장되지 않게
+            rows.push(row);
+            if (!st.minDate || date < st.minDate) st.minDate = date;
+            if (!st.maxDate || date > st.maxDate) st.maxDate = date;
+            if (typeof row['구매단가'] === 'number') st.sum += row['구매단가'];
+            const tk = row['정비유형'] || '(비어 있음)'; st.types[tk] = (st.types[tk] || 0) + 1;
+        }
+        return { rows, errors, warnings, stats: st };
+    }
+    function rawBranchLabel(code) { const b = branchList.find(x => x[0] === code); return b ? b[1] : code; }
+    function openRaw() {
+        if (typeof closeUnifiedSettingsModal === 'function') closeUnifiedSettingsModal();
+        rawState = { rows: [], code: '', name: '' };
+        $('auth-raw-file').value = ''; $('auth-raw-info').textContent = ''; $('auth-raw-preview').innerHTML = ''; $('auth-raw-log').innerHTML = '';
+        $('auth-raw-go').disabled = true;
+        const ro = !canEdit('upload') || (session && session.user.isTest);
+        const sel = $('auth-raw-branch');
+        const list = branchList.filter(b => !/^MASTER/i.test(String(b[1]).replace(/\s/g, '')));
+        sel.innerHTML = list.map(b => '<option value="' + b[0] + '">' + b[1] + ' (' + b[0] + ')</option>').join('');
+        let def = '';
+        try { def = dataBranch(); } catch (e) {}
+        if (list.some(b => b[0] === def)) sel.value = def;
+        $('auth-raw-file').disabled = ro; sel.disabled = ro;
+        $('auth-raw-go').classList.toggle('auth-hide', ro);
+        if (ro) $('auth-raw-info').textContent = (session && session.user.isTest) ? 'TEST 서버에서는 실제 시트에 올릴 수 없습니다.' : '조회 전용 화면입니다. 업로드는 MASTER 관리자만 할 수 있습니다.';
+        $('auth-raw-overlay').style.display = 'flex';
+    }
+    function closeRaw() { $('auth-raw-overlay').style.display = 'none'; }
+    async function rawOnFile(file) {
+        if (!file) return;
+        const info = $('auth-raw-info'), pv = $('auth-raw-preview');
+        info.textContent = '읽는 중...'; pv.innerHTML = ''; $('auth-raw-log').innerHTML = ''; $('auth-raw-go').disabled = true; rawState.rows = [];
+        try {
+            await loadXlsx();
+            const wb = XLSX.read(await file.arrayBuffer(), { type: 'array', cellDates: true });
+            const code = $('auth-raw-branch').value;
+            let res = null, used = '';
+            for (const name of wb.SheetNames) {
+                if (/^(안내|목록)$/.test(name)) continue;
+                const aoa = XLSX.utils.sheet_to_json(wb.Sheets[name], { header: 1, raw: true, defval: '', blankrows: true });
+                const r = rawBuild(aoa, code);
+                if (!r.error) { res = r; used = name; break; }
+            }
+            if (!res) throw new Error('머리글을 찾지 못했습니다. "접수일자 / 장비 구분 / 장비번호" 열이 있는 RAWDATA 업로드 양식을 사용하세요.');
+            rawState = { rows: res.rows, code, name: rawBranchLabel(code), file: file.name };
+            const st = res.stats;
+            info.textContent = file.name + ' — 시트 "' + used + '"';
+            const tp = Object.keys(st.types).map(k => k + ' ' + st.types[k].toLocaleString() + '건').join(' · ');
+            const list = (arr, color, n) => arr.length ? '<div style="color:' + color + ';margin-top:6px;">' + arr.slice(0, n).map(x => '· ' + x).join('<br>') + (arr.length > n ? '<br>… 외 ' + (arr.length - n) + '건' : '') + '</div>' : '';
+            pv.innerHTML = '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;text-align:center;">'
+                + '<div style="background:#f1f5f9;border-radius:10px;padding:8px;"><div style="font-size:10px;color:#64748b;">읽은 행</div><div style="font-size:18px;font-weight:800;">' + st.total.toLocaleString() + '</div></div>'
+                + '<div style="background:#ecfdf5;border-radius:10px;padding:8px;"><div style="font-size:10px;color:#64748b;">올릴 행</div><div style="font-size:18px;font-weight:800;color:#15803d;">' + res.rows.length.toLocaleString() + '</div></div>'
+                + '<div style="background:' + (res.errors.length ? '#fef2f2' : '#f1f5f9') + ';border-radius:10px;padding:8px;"><div style="font-size:10px;color:#64748b;">제외(오류)</div><div style="font-size:18px;font-weight:800;color:' + (res.errors.length ? '#dc2626' : '#16232E') + ';">' + res.errors.length.toLocaleString() + '</div></div>'
+                + '<div style="background:#f1f5f9;border-radius:10px;padding:8px;"><div style="font-size:10px;color:#64748b;">구매단가 합계</div><div style="font-size:14px;font-weight:800;line-height:1.9;">₩ ' + Math.round(st.sum).toLocaleString() + '</div></div></div>'
+                + '<div style="margin-top:8px;color:#475569;">기간 ' + (st.minDate || '-') + ' ~ ' + (st.maxDate || '-') + (tp ? '<br>' + tp : '') + (st.autoCost ? '<br>구매단가가 비어 있어 수량×부품단가로 계산한 행: ' + st.autoCost + '건' : '') + (st.examples ? '<br>예시 행 ' + st.examples + '건은 제외했습니다.' : '') + '</div>'
+                + list(res.errors, '#dc2626', 8) + list(res.warnings, '#b45309', 5);
+            $('auth-raw-go').disabled = !res.rows.length;
+        } catch (e) { info.textContent = ''; pv.innerHTML = '<span style="color:#dc2626;">' + (e.message || e) + '</span>'; }
+    }
+    async function rawSend(rows, code, name, onProgress) {
+        let url = ''; try { url = GAS_URL; } catch (e) {}
+        if (!url) throw new Error('정비 데이터 서버 주소가 없습니다. 설정 > 연동 설정을 확인하세요.');
+        const SIZE = 300; let inserted = 0, skipped = 0;
+        for (let i = 0; i < rows.length; i += SIZE) {
+            if (onProgress) onProgress(Math.min(i + SIZE, rows.length), rows.length);
+            const res = await fetch(url, { method: 'POST', body: JSON.stringify({ branchCode: code, branchName: name, rows: rows.slice(i, i + SIZE) }) });
+            if (!res.ok) throw new Error('서버 응답 오류 (HTTP ' + res.status + ')');
+            const r = await res.json();
+            if (!r || r.result !== 'success') throw new Error((r && r.message) || '저장 실패');
+            inserted += r.inserted || 0; skipped += r.skipped || 0;
+        }
+        return { inserted, skipped };
+    }
+    async function rawGo() {
+        if (!rawState.rows.length) return;
+        const code = $('auth-raw-branch').value;
+        if (code !== rawState.code) { alert('대상 지사를 바꿨습니다. 파일을 다시 선택해 주세요.'); return; }
+        const nm = rawBranchLabel(code);
+        if (!confirm(nm + ' (' + code + ') 지사의 RAWDATA 탭에 ' + rawState.rows.length.toLocaleString() + '건을 추가합니다.\n\n지사가 맞는지 다시 확인하세요. 계속할까요?')) return;
+        const log = $('auth-raw-log'), go = $('auth-raw-go');
+        go.disabled = true; log.innerHTML = '';
+        const d = document.createElement('div'); log.appendChild(d); d.textContent = '⏳ 올리는 중...';
+        try {
+            const r = await rawSend(rawState.rows, code, nm, (a, b) => { d.textContent = '⏳ 올리는 중... ' + a.toLocaleString() + ' / ' + b.toLocaleString(); });
+            d.style.color = '#15803d';
+            d.innerHTML = '✔ ' + nm + ' — ' + r.inserted.toLocaleString() + '건 저장' + (r.skipped ? ', 이미 있는 ' + r.skipped.toLocaleString() + '건은 건너뜀' : '') + '<br><span style="color:#475569;">대시보드·캘린더에 반영하려면 화면 새로고침(F5) 하세요.</span>';
+            rawState.rows = [];
+        } catch (e) {
+            d.style.color = '#dc2626'; d.textContent = '✖ ' + (e.message || e);
+            const n = document.createElement('div'); n.style.color = '#b45309'; n.textContent = '중간에 멈췄습니다. 같은 파일을 다시 올려도 이미 저장된 행은 중복 저장되지 않습니다.'; log.appendChild(n);
+            go.disabled = false;
+        }
+    }
+    function rawTemplate() {
+        loadXlsx().then(() => {
+            const head = RAW_FIELDS.map(f => f[0]);
+            const aoa = [head, ['2024-03-15', '서브원', '계획정비', '지게차', '6664', '타이어', '저장품', '8.25-15', '(예시) 8.25-15 타이어 교체 6본', 6, 426000, 2556000, '', '', '']];
+            const guide = [['정비 이력(RAWDATA) 업로드 양식'], ['필수: 접수일자, 장비 구분, 장비번호'], ['정비유형: 계획정비 / 돌발장애'], ['사용방법: 저장품 / 인건비 / 소모품 / 부품 / 부외자산 / 사내수리'], ['구매단가는 합계금액입니다. 비우면 수량×부품단가로 계산합니다.'], ['"(예시"로 시작하는 문제점 행은 업로드에서 제외됩니다.']];
+            const wb = XLSX.utils.book_new();
+            const g = XLSX.utils.aoa_to_sheet(guide); g['!cols'] = [{ wch: 80 }]; XLSX.utils.book_append_sheet(wb, g, '안내');
+            const w = XLSX.utils.aoa_to_sheet(aoa); w['!cols'] = [12, 16, 10, 14, 10, 12, 10, 18, 34, 7, 12, 13, 12, 12, 10].map(x => ({ wch: x })); XLSX.utils.book_append_sheet(wb, w, '입력양식');
+            XLSX.writeFile(wb, 'RAWDATA_업로드_양식.xlsx');
+        }).catch(e => alert(e.message || e));
+    }
+
     /* ---------- 임시: 지사별 데이터 구분 전까지 전북 외 지사는 데이터 화면을 비워 둠 ----------
      * 기존 구글시트 데이터가 전북 것뿐이라, 다른 지사가 들어와도 전북 데이터가 보이지 않게 막는다.
      * 지사별 데이터 구분이 끝나면 이 부분(LEGACY_DATA_BRANCH_NAME, dataBlocked, syncEmpty)을 삭제하면 된다. */
@@ -1557,7 +1777,7 @@ const AUTH = (function () {
         document.body.classList.toggle('auth-empty-data', blocked);
         const p = $('auth-empty-panel');
         const view = (typeof currentOuterView !== 'undefined') ? currentOuterView : 'home';
-        if (!blocked || view === 'home' || view === 'repair' || view === 'input' || view === 'dashboard' || view === 'analysis' || view === 'board' || view === 'calendar' || view === 'livedash') { p.classList.add('auth-hide'); return; }
+        if (!blocked || view === 'home' || view === 'repair' || view === 'input' || view === 'dashboard' || view === 'analysis' || view === 'board' || view === 'calendar' || view === 'livedash' || view === 'stock') { p.classList.add('auth-hide'); return; }
         const bar = document.getElementById('status-bar') || document.getElementById('global-nav');
         p.style.top = (bar ? Math.max(0, bar.getBoundingClientRect().bottom) : 0) + 'px';
         $('auth-empty-branch').textContent = viewing ? nameOf(viewing) : session.user.branchName;
@@ -2068,7 +2288,7 @@ const AUTH = (function () {
     }
     window.addEventListener('load', init);
 
-    return { importAllFromSheet, login, logout, openPw, closePw, changePw, openForgot, closeForgot, sendForgot, openCard, openUpload, closeUpload, onFile, doUpload, pwCount, pwToggle, viewBranch, exitView, openUsers, closeUsers, renderUsers, userForm, userFormClose, userSave, openPerms, closePerms, savePerms, mdFetch, mdPost, importLegacy, copyFrom, canEdit, loadXlsx };
+    return { importAllFromSheet, login, logout, openPw, closePw, changePw, openForgot, closeForgot, sendForgot, openCard, openUpload, closeUpload, onFile, doUpload, pwCount, pwToggle, viewBranch, exitView, openUsers, closeUsers, renderUsers, userForm, userFormClose, userSave, openPerms, closePerms, savePerms, mdFetch, mdPost, importLegacy, copyFrom, canEdit, loadXlsx, openRaw, closeRaw, rawOnFile, rawGo, rawTemplate, rawBuild, rawSend };
 })();
 </script>
 
@@ -2144,6 +2364,14 @@ const AUTH = (function () {
                         <div style="flex:1;">
                             <div class="font-bold text-[#16232E] text-sm">엑셀 업로드</div>
                             <div class="text-xs text-gray-500 mt-0.5">지사코드표·사용자·장비마스터·정비데이터·가동데이터</div>
+                        </div>
+                        <i class="fa-solid fa-chevron-right text-gray-400 text-xs"></i>
+                    </div>
+                <div id="settings-item-raw" onclick="closeUnifiedSettingsModal(); AUTH.openRaw()" style="display:flex; align-items:center; gap:14px; padding:16px; border:1px solid #e2e8f0; border-radius:10px; cursor:pointer; transition:background 0.15s;">
+                        <div style="width:40px; height:40px; border-radius:10px; background:rgba(17,26,26,0.08); display:flex; align-items:center; justify-content:center; color:#16232E; font-size:16px;"><i class="fa-solid fa-table-list"></i></div>
+                        <div style="flex:1;">
+                            <div class="font-bold text-[#16232E] text-sm">정비 이력(RAWDATA) 엑셀 업로드</div>
+                            <div class="text-xs text-gray-500 mt-0.5">지사별 과거 정비 데이터를 엑셀 양식으로 한꺼번에 업로드</div>
                         </div>
                         <i class="fa-solid fa-chevron-right text-gray-400 text-xs"></i>
                     </div>
@@ -2366,12 +2594,12 @@ const AUTH = (function () {
     </div>
 
     <!-- ============================================================
-         VIEW: 재고 관리 (GitHub Pages: https://heosungyoung80-hub.github.io/sebang-inventory/)
+         VIEW: 재고 관리 (같은 저장소의 stock.html)
          ============================================================ -->
     <div id="view-stock" class="view-section" style="flex-direction:column;">
         <div class="ext-bar">
             <span></span>
-            <a href="https://heosungyoung80-hub.github.io/sebang-inventory/" target="_blank" rel="noopener"><i class="fa-solid fa-up-right-from-square"></i> 새 창에서 열기</a>
+            <a href="stock.html" target="_blank" rel="noopener"><i class="fa-solid fa-up-right-from-square"></i> 새 창에서 열기</a>
         </div>
         <iframe id="stock-iframe" src="" allow="camera; clipboard-write" style="flex:1; width:100%; border:none;" title="재고 관리"></iframe>
     </div>
@@ -2931,12 +3159,29 @@ const AUTH = (function () {
         
         const breadcrumbLabels = { home: '메인 화면', board: '게시판', input: '데이터 입력', dashboard: '통합 대시보드', calendar: '정비 일정 캘린더', livedash: '실시간 정비 현황판', repair: '수리요청/접수', analysis: '정비 데이터 분석', daily: '장비 가동일보', stock: '재고 관리' };
         // 같은 폴더에 있는 별도 프로그램 파일. 파일 이름이 바뀌면 여기만 고치면 됨
-        const EXTERNAL_APPS = { daily: 'https://yesman-888.github.io/', stock: 'https://heosungyoung80-hub.github.io/sebang-inventory/' };
+        const EXTERNAL_APPS = { daily: 'https://yesman-888.github.io/', stock: 'stock.html' };
+        // 재고(저장품) 관리: 로그인한 지사 정보를 주소에 실어 보냄 (본사·MASTER 합계 보기 / 본사 조회 전용 / TEST 서버는 조회 전용)
+        function externalUrl(key) {
+            const base = EXTERNAL_APPS[key];
+            if (key !== 'stock') return base;
+            let code = '36', ro = 0, user = '';
+            try {
+                const info = window.repairBranchInfo ? window.repairBranchInfo() : null;
+                const u = window.SEBANG_SESSION && window.SEBANG_SESSION.user;
+                if (info) code = info.all ? 'all' : info.code;
+                if (u) {
+                    user = u.name || '';
+                    if ((u.isHQ && !u.isMaster) || u.isTest || code === 'all') ro = 1;
+                    if (u.isTest) code = info && !info.all ? info.code : '36';
+                }
+            } catch (e) {}
+            return base + '?branch=' + encodeURIComponent(code) + '&user=' + encodeURIComponent(user) + '&ro=' + ro;
+        }
         let isDailyLoaded = false;
         let isStockLoaded = false;
         let currentOuterView = 'dashboard';
         let isLiveDashLoaded = false;
-        window.resetCalLiveFrames = function () { isCalendarLoaded = false; isLiveDashLoaded = false; try { document.getElementById('calendar-iframe').srcdoc = ''; document.getElementById('livedash-iframe').srcdoc = ''; } catch (e) {} };
+        window.resetCalLiveFrames = function () { isCalendarLoaded = false; isLiveDashLoaded = false; isStockLoaded = false; try { document.getElementById('stock-iframe').src = 'about:blank'; } catch (e) {} try { document.getElementById('calendar-iframe').srcdoc = ''; document.getElementById('livedash-iframe').srcdoc = ''; } catch (e) {} };
         let isAnalysisLoaded = false;
 
         function switchView(viewName) {
@@ -2998,7 +3243,7 @@ const AUTH = (function () {
                 isDailyLoaded = true;
             }
             if(viewName === 'stock' && !isStockLoaded) {
-                document.getElementById('stock-iframe').src = EXTERNAL_APPS.stock;
+                document.getElementById('stock-iframe').src = externalUrl('stock');
                 isStockLoaded = true;
             }
         }
@@ -3121,7 +3366,7 @@ const AUTH = (function () {
             } else if (currentOuterView === 'daily' || currentOuterView === 'stock') {
                 const frame = document.getElementById(currentOuterView === 'daily' ? 'daily-iframe' : 'stock-iframe');
                 if (frame) {
-                    const base = EXTERNAL_APPS[currentOuterView];
+                    const base = externalUrl(currentOuterView);
                     frame.src = base + (base.includes('?') ? '&' : '?') + '_ts=' + Date.now();
                 }
                 setTimeout(stopSpin, 1200);
