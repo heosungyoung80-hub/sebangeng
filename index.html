@@ -3160,9 +3160,16 @@ const AUTH = (function () {
         const breadcrumbLabels = { home: '메인 화면', board: '게시판', input: '데이터 입력', dashboard: '통합 대시보드', calendar: '정비 일정 캘린더', livedash: '실시간 정비 현황판', repair: '수리요청/접수', analysis: '정비 데이터 분석', daily: '장비 가동일보', stock: '재고 관리' };
         // 같은 폴더에 있는 별도 프로그램 파일. 파일 이름이 바뀌면 여기만 고치면 됨
         const EXTERNAL_APPS = { daily: 'https://yesman-888.github.io/', stock: 'stock.html' };
+        const STOCK_FALLBACK_URL = 'https://heosungyoung80-hub.github.io/sebang-inventory/';   // stock.html 이 아직 올라가 있지 않을 때만 쓰는 예전 주소
+        let stockBaseUrl = null;
+        function resolveStockBase() {
+            if (stockBaseUrl) return Promise.resolve(stockBaseUrl);
+            return fetch('stock.html', { method: 'HEAD', cache: 'no-store' }).then(r => r.ok ? 'stock.html' : STOCK_FALLBACK_URL).catch(() => STOCK_FALLBACK_URL).then(u => (stockBaseUrl = u));
+        }
         // 재고(저장품) 관리: 로그인한 지사 정보를 주소에 실어 보냄 (본사·MASTER 합계 보기 / 본사 조회 전용 / TEST 서버는 조회 전용)
         function externalUrl(key) {
-            const base = EXTERNAL_APPS[key];
+            let base = EXTERNAL_APPS[key];
+            if (key === 'stock' && stockBaseUrl) base = stockBaseUrl;
             if (key !== 'stock') return base;
             let code = '36', ro = 0, user = '';
             try {
@@ -3243,8 +3250,8 @@ const AUTH = (function () {
                 isDailyLoaded = true;
             }
             if(viewName === 'stock' && !isStockLoaded) {
-                document.getElementById('stock-iframe').src = externalUrl('stock');
                 isStockLoaded = true;
+                resolveStockBase().then(() => { document.getElementById('stock-iframe').src = externalUrl('stock'); });
             }
         }
 
