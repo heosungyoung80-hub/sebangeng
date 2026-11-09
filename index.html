@@ -5551,6 +5551,13 @@ const AUTH = (function () {
                 }
             }
 
+            // 수리요청서에서 만든 일정이면 품의서에 업체 정보가 아직 비어 있어도 연결해 둠
+            // → 여기서 업체·금액을 입력해 "시트에 전송"하면 수리 품의서(인쇄본)에도 반영됨
+            if (linkedRepairItem && !fd.linkedRepair) {
+                fd.linkedRepair = { id: linkedRepairItem.id, receiptNo: linkedRepairItem.receiptNo || '' };
+            }
+            if (typeof renderLinkedRepairBanner === 'function') renderLinkedRepairBanner();
+
             // 캘린더 일정 자체 내용(수리요청과 연결되지 않은 일반 일정)이면 기존처럼 항목 하나로 미리 등록
             if (!linkedRepairItem && data.content && fd.methods.length === 0) {
                 addMethod('소모품');
