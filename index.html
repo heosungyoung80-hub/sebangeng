@@ -870,6 +870,10 @@
             #view-dashboard.mobile-sidebar-open #dash-sidebar,
             #view-daily.mobile-sidebar-open #daily-sidebar { display: flex !important; }
             #dash-sidebar { flex-direction: column; }
+            /* 모바일 필터 패널: 안쪽 목록(장비번호 등)이 따로 스크롤되며 터치를 가로채 화면이 안 움직이던 문제 → 패널 하나만 스크롤 */
+            #dash-sidebar, #input-sidebar, #daily-sidebar { overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; touch-action: pan-y; }
+            #dash-sidebar > * { flex-shrink: 0; }
+            #dash-sidebar .slicer-body { max-height: none !important; overflow: visible !important; }
             #input-main, #dash-main { width: 100% !important; min-width: 0; flex: 1 1 auto; padding: 12px !important; box-sizing: border-box; }
             #dash-main { overflow-y: auto; }
             #view-daily > div:not(.sidebar-col) { padding: 12px !important; }
