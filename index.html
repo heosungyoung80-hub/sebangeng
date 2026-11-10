@@ -1568,7 +1568,7 @@ const AUTH = (function () {
         ['장비 구분', ['장비구분', '기종']], ['장비번호', ['장비번호', '차량번호']], ['정비 구분', ['정비구분', '수리부품']],
         ['사용방법', ['사용방법', '비용구분']], ['규격', ['규격']], ['문제점', ['문제점', '수리내용']],
         ['수량', ['수량']], ['부품단가', ['부품단가', '단가']], ['구매단가', ['구매단가', '합계금액', '합계']],
-        ['불량 유형', ['불량유형']], ['장비 상태', ['장비상태']], ['긴급도', ['긴급도']]
+        ['불량 유형', ['불량유형']], ['장비 상태', ['장비상태']], ['긴급도', ['긴급도']], ['원가절감', ['원가절감']]
     ];
     const RAW_TYPES = ['계획정비', '돌발장애'];
     const RAW_USE = ['저장품', '인건비', '소모품', '부품', '부외자산', '사내수리'];
@@ -1649,6 +1649,7 @@ const AUTH = (function () {
             row['불량 유형'] = rawText(get('불량 유형'));
             row['장비 상태'] = RAW_STATUS[sv] || sv;
             row['긴급도'] = RAW_URGENCY[ug] || ug;
+            { const sv2 = rawText(get('원가절감')).toUpperCase(); row['원가절감'] = (sv2 === 'Y' || sv2 === 'O' || sv2 === '○' || sv2 === '예' || sv2 === '1') && row['사용방법'] === '사내수리' ? 'Y' : ''; }
             if (errs.length) { errors.push(no + '행: ' + errs.join(', ')); continue; }
             if (row['정비유형'] && RAW_TYPES.indexOf(row['정비유형']) < 0) warnings.push(no + '행: 정비유형 "' + row['정비유형'] + '" (계획정비/돌발장애 아님 — 비용 집계에서 빠질 수 있음)');
             if (row['사용방법'] && RAW_USE.indexOf(row['사용방법']) < 0) warnings.push(no + '행: 사용방법 "' + row['사용방법'] + '" (목록에 없는 값)');
@@ -2834,6 +2835,18 @@ const AUTH = (function () {
             <div class="grid grid-cols-2 gap-5 mb-6">
                 <div class="chart-container"><div class="flex justify-between items-center mb-2"><span class="font-bold text-[#16232E] text-sm">장비호기별 누적단가</span><span class="text-xs text-gray-500">(단위 : 백만원)</span></div><div class="relative h-[300px] w-full"><canvas id="unitBarChart"></canvas></div></div>
                 <div class="chart-container"><div class="flex justify-between items-center mb-2"><span class="font-bold text-[#16232E] text-sm">비용구분별 비용</span><span class="text-xs text-gray-500">(단위 : 백만원)</span></div><div class="relative h-[300px] w-full flex justify-center"><canvas id="unitPie2Chart"></canvas></div></div>
+            </div>
+
+            <h2 class="section-title"><span class="title-text">세방(주) <span class="js-branch-label">전북지사</span> 사내수리 원가절감 현황</span></h2>
+            <div class="chart-container mb-6" id="saving-card">
+                <div class="flex flex-wrap gap-3 items-stretch mb-3">
+                    <div style="flex:1;min-width:160px;background:#e1f5ee;border-radius:10px;padding:12px 14px;"><div class="text-xs text-gray-500">원가절감 건수</div><div class="font-bold text-xl" style="color:#0f6e56;" id="saving-count">0건</div></div>
+                    <div style="flex:1;min-width:160px;background:#e1f5ee;border-radius:10px;padding:12px 14px;"><div class="text-xs text-gray-500">원가절감액 합계 <span style="font-size:10px;">(예상금액 기준)</span></div><div class="font-bold text-xl" style="color:#0f6e56;" id="saving-total">0원</div></div>
+                    <div style="flex:1;min-width:160px;background:#f1f5f9;border-radius:10px;padding:12px 14px;"><div class="text-xs text-gray-500">결산 완료 <span style="font-size:10px;">(결산 프로그램 연동 예정)</span></div><div class="font-bold text-base" style="color:#334155;" id="saving-settled">0건 · 0원</div><div class="text-xs text-gray-500" id="saving-pending">결산 대기 0건</div></div>
+                    <div style="flex:2;min-width:260px;font-size:12px;color:#64748b;line-height:1.6;align-self:center;">사내수리로 처리하면서 수리요청서·데이터 입력에서 <b>💰 원가절감</b>에 체크한 건만 집계합니다. 왼쪽 필터(년·장비 구분·장비번호·월·비용구분)가 그대로 적용됩니다.</div>
+                </div>
+                <div class="overflow-x-auto mb-3"><table class="data-table" id="savingByEquip"><thead><tr><th>장비 구분</th><th>건수</th><th>절감액(원)</th></tr></thead><tbody></tbody></table></div>
+                <div class="overflow-x-auto"><table class="data-table" id="savingDetail"><thead><tr><th>접수일자</th><th>장비</th><th>정비 구분</th><th>작업 내용</th><th>예상(원)</th><th>결산(원)</th></tr></thead><tbody></tbody></table></div>
             </div>
         </div>
     </div>
@@ -5349,11 +5362,20 @@ const AUTH = (function () {
                             <input type="text" inputmode="numeric" placeholder="0" value="${m.p_price ? m.p_price.toLocaleString() : ''}" oninput="formatNumberInput(this); updateItemCost('${m.id}','p_price',this.value.replace(/,/g,''));">
                         </div>
                     </div>
+                    ${m.type === '사내수리' ? `<label class="mt-2 flex items-center gap-2 text-xs font-bold cursor-pointer" style="color:#0f6e56;" title="사내수리로 처리해 외주비를 줄인 건이면 체크 (금액이 원가절감액으로 집계됩니다)"><input type="checkbox" ${m.saving ? 'checked' : ''} onchange="toggleMethodSaving('${m.id}', this.checked)"> 💰 원가절감 (사내수리로 외주비 절감 · 금액이 절감액으로 집계)</label>` : ''}
                     <div class="text-right text-sm mt-2 text-gray-600">금액(소계): <span class="font-bold text-red-600" id="subtotal-${m.id}">${m.total.toLocaleString()}원</span></div>
                 </div>
             `).join('');
 
             updateGrandTotal();
+        }
+
+        function toggleMethodSaving(id, on) {
+            const m = fd.methods.find(x => x.id === id);
+            if (!m) return;
+            m.saving = !!on;
+            if (typeof saveDraft === 'function') saveDraft();
+            updatePreview();
         }
 
         function updateItemCost(id, field, value) {
@@ -5538,6 +5560,7 @@ const AUTH = (function () {
                         const m = fd.methods[fd.methods.length - 1];
                         m.vendor = row.vendor || '';
                         m.repairReason = row.reason || '';
+                        m.saving = (m.type === '사내수리') && !!row.saving;
                         // "정비 구분" 칸에는 항상 실제 정비구분(대분류) 값이 들어가야 하므로,
                         // 수리요청 접수번호/요청내용은 "문제점" 칸으로 보냄 (두 값이 섞이지 않도록)
                         m.part = fd.partCategory || linkedRepairItem.partCategory || '';
@@ -5691,7 +5714,8 @@ const AUTH = (function () {
                 "문제점": m.issue,
                 "수량": m.qty,
                 "부품단가": m.p_price,
-                "구매단가": m.total
+                "구매단가": m.total,
+                "원가절감": (m.type === '사내수리' && m.saving) ? 'Y' : ''
             }));
         }
 
@@ -6041,7 +6065,35 @@ const AUTH = (function () {
             return active.length === 0 ? EQUIP_LIST : active;
         }
 
+        // 사내수리 원가절감 집계: 원가절감 체크(Y)된 사내수리 건의 예상금액(구매단가)을 합산
+        function renderSavingCard(data) {
+            const cnt = document.getElementById('saving-count'); if (!cnt) return;
+            const rows = (data || []).filter(r => {
+                const v = r['원가절감']; const on = (v === true || String(v).toUpperCase() === 'Y');
+                return on && (r['사용방법'] === '사내수리');
+            });
+            const costOf = r => parseFloat(r['절감예상금액'] || r['구매단가'] || r['합계금액'] || r['합계'] || r['total']) || 0;   // 예상금액(절감 체크 시점)
+            const settledOf = r => (r['결산금액'] === '' || r['결산금액'] == null) ? null : (parseFloat(r['결산금액']) || 0);
+            const done = rows.filter(r => settledOf(r) !== null);
+            document.getElementById('saving-settled').textContent = done.length.toLocaleString() + '건 · ' + Math.round(done.reduce((a, r) => a + settledOf(r), 0)).toLocaleString() + '원';
+            document.getElementById('saving-pending').textContent = '결산 대기 ' + (rows.length - done.length).toLocaleString() + '건';
+            const total = rows.reduce((a, r) => a + costOf(r), 0);
+            cnt.textContent = rows.length.toLocaleString() + '건';
+            document.getElementById('saving-total').textContent = Math.round(total).toLocaleString() + '원';
+            const byEq = {};
+            rows.forEach(r => { const k = r['장비 구분'] || r['장비구분'] || '기타'; (byEq[k] = byEq[k] || { n: 0, v: 0 }); byEq[k].n++; byEq[k].v += costOf(r); });
+            const eqRows = Object.entries(byEq).sort((a, b) => b[1].v - a[1].v);
+            document.querySelector('#savingByEquip tbody').innerHTML = eqRows.length
+                ? eqRows.map(([k, o]) => '<tr><td>' + escapeHtml(k) + '</td><td>' + o.n.toLocaleString() + '</td><td>' + Math.round(o.v).toLocaleString() + '</td></tr>').join('')
+                : '<tr><td colspan="3" style="color:#94a3b8;">체크된 원가절감 건이 없습니다.</td></tr>';
+            const det = rows.slice().sort((a, b) => String(b['접수일자']).localeCompare(String(a['접수일자']))).slice(0, 100);
+            document.querySelector('#savingDetail tbody').innerHTML = det.length
+                ? det.map(r => '<tr><td>' + escapeHtml(String(r['접수일자'] || '').substring(0, 10)) + '</td><td>' + escapeHtml((r['장비 구분'] || '') + ' ' + (r['장비번호'] || '')) + '</td><td>' + escapeHtml(r['정비 구분'] || '') + '</td><td style="text-align:left;">' + escapeHtml(String(r['문제점'] || '')) + '</td><td>' + Math.round(costOf(r)).toLocaleString() + '</td><td>' + (settledOf(r) === null ? '<span style="color:#94a3b8;">대기</span>' : Math.round(settledOf(r)).toLocaleString()) + '</td></tr>').join('') + (rows.length > 100 ? '<tr><td colspan="6" style="color:#94a3b8;">최근 100건만 표시합니다. (집계는 전체 ' + rows.length + '건)</td></tr>' : '')
+                : '<tr><td colspan="6" style="color:#94a3b8;">-</td></tr>';
+        }
+
         function updateCharts(data) {
+            try { renderSavingCard(data); } catch (e) { console.warn('원가절감 집계 오류', e); }
             const months = ['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'];
             let planMaint = Array(12).fill(0), suddenMaint = Array(12).fill(0);
             let typeTrend = Array(12).fill(0), typeParts = {}, unitSums = {}, usages = {};
@@ -7489,6 +7541,7 @@ const AUTH = (function () {
                 </div>
                 <div style="display:flex; gap:8px; flex-wrap:wrap;">
                     <input type="text" class="rv-cost" inputmode="numeric" placeholder="예상금액 (원)" value="${costDigits ? Number(costDigits).toLocaleString() : ''}" data-rawvalue="${costDigits}" oninput="onVendorCostInput(this)" style="width:150px; padding:6px; border:1px solid #ddd; border-radius:6px; font-size:12px; text-align:right;">
+                    <label class="rv-saving-wrap" title="사내수리로 처리해 외주비를 줄인 건이면 체크 (예상금액이 원가절감액으로 집계됩니다)" style="display:${row.category === '사내수리' ? 'inline-flex' : 'none'}; align-items:center; gap:4px; font-size:12px; font-weight:700; color:#0f6e56; white-space:nowrap; cursor:pointer;"><input type="checkbox" class="rv-saving" ${row.saving ? 'checked' : ''}> 💰 원가절감</label>
                     <input type="text" class="rv-reason" placeholder="${(row.category === '사내수리') ? '자가 수리 사유 · 작업 내용' : '선정 사유'}" value="${escapeAttr(row.reason || '')}" style="flex:1; min-width:160px; padding:6px; border:1px solid #ddd; border-radius:6px; font-size:12px;">
                 </div>
             </div>`;
@@ -7511,7 +7564,8 @@ const AUTH = (function () {
                 category: rowEl.querySelector('.rv-category').value,
                 vendor: rowEl.querySelector('.rv-vendor').value.trim(),
                 cost: rowEl.querySelector('.rv-cost').dataset.rawvalue || '',
-                reason: rowEl.querySelector('.rv-reason').value.trim()
+                reason: rowEl.querySelector('.rv-reason').value.trim(),
+                saving: rowEl.querySelector('.rv-category').value === IN_HOUSE_CATEGORY && !!(rowEl.querySelector('.rv-saving') && rowEl.querySelector('.rv-saving').checked)
             };
         });
     }
@@ -7539,6 +7593,8 @@ const AUTH = (function () {
         if (!vendorEl) return;
 
         const isInHouse = (selectEl.value === IN_HOUSE_CATEGORY);
+        const sw = rowEl.querySelector('.rv-saving-wrap');
+        if (sw) { sw.style.display = isInHouse ? 'inline-flex' : 'none'; if (!isInHouse) { const cb = sw.querySelector('.rv-saving'); if (cb) cb.checked = false; } }
         if (isInHouse) {
             if (!vendorEl.value.trim()) vendorEl.value = IN_HOUSE_VENDOR;
             vendorEl.placeholder = '사내 처리 부서 · 담당 (예: 사내정비)';
@@ -7591,7 +7647,8 @@ const AUTH = (function () {
                 category: REPAIR_USAGE_CATEGORIES.indexOf(m.type) > -1 ? m.type : '소모품',
                 vendor: String(m.vendor).trim(),
                 cost: Number(m.total) || 0,
-                reason: (m.repairReason || extractReasonFromIssue(m.issue) || '').trim()
+                reason: (m.repairReason || extractReasonFromIssue(m.issue) || '').trim(),
+                saving: m.type === IN_HOUSE_CATEGORY && !!m.saving
             }));
     }
 
@@ -7822,6 +7879,7 @@ const AUTH = (function () {
             const m = fd.methods[fd.methods.length - 1];
             m.vendor = row.vendor || '';
             m.repairReason = row.reason || '';
+            m.saving = (m.type === '사내수리') && !!row.saving;
             // "정비 구분" 칸에는 항상 실제 정비구분(대분류) 값이 들어가야 하므로,
             // 수리요청 접수번호/요청내용은 "문제점" 칸으로 보냄 (두 값이 섞이지 않도록)
             m.part = fd.partCategory || item.partCategory || '';
@@ -8901,7 +8959,7 @@ ${completePhotoThumbsHtml(item)}
                     return categories.map(cat => {
                         const catRows = rows.filter(r => (r.category || '소모품') === cat);
                         if (catRows.length === 0) return '';
-                        const body = catRows.map(r => `<tr><td style="text-align:left;">${escapeHtml(r.vendor || '')}</td><td style="text-align:right;">${r.cost ? Number(r.cost).toLocaleString() + ' 원' : ''}</td><td style="text-align:left;">${escapeHtml(r.reason || '')}</td></tr>`).join('');
+                        const body = catRows.map(r => `<tr><td style="text-align:left;">${escapeHtml(r.vendor || '')}</td><td style="text-align:right;">${r.cost ? Number(r.cost).toLocaleString() + ' 원' : ''}</td><td style="text-align:left;">${escapeHtml(r.reason || '')}${(cat === '사내수리' && r.saving) ? ' <b>[원가절감]</b>' : ''}</td></tr>`).join('');
                         return `<tr><td class="label" style="${headerStyle} font-size:13px;">${cat}</td><td colspan="3" style="padding:0;">
                             <table style="margin-bottom:0;">
                                 <tr><td class="label" style="width:34%;">${cat === '사내수리' ? '처리 부서' : '거래처'}</td><td class="label" style="width:26%;">예상금액</td><td class="label">${cat === '사내수리' ? '작업 내용' : '선정 사유'}</td></tr>
