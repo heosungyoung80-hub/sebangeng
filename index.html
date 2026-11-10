@@ -2853,7 +2853,7 @@ const AUTH = (function () {
                     <div style="flex:2;min-width:260px;font-size:12px;color:#64748b;line-height:1.6;align-self:center;">사내수리로 처리하면서 수리요청서·데이터 입력에서 <b>💰 원가절감</b>에 체크한 건만 집계합니다. 왼쪽 필터(년·장비 구분·장비번호·월·비용구분)가 그대로 적용됩니다.</div>
                 </div>
                 <div class="overflow-x-auto mb-3"><table class="data-table" id="savingByEquip"><thead><tr><th>장비 구분</th><th>건수</th><th>절감액(원)</th></tr></thead><tbody></tbody></table></div>
-                <div class="overflow-x-auto"><table class="data-table" id="savingDetail"><thead><tr><th>접수일자</th><th>장비</th><th>정비 구분</th><th>작업 내용</th><th>예상(원)</th><th>결산(원)</th></tr></thead><tbody></tbody></table></div>
+                <div class="overflow-x-auto"><table class="data-table" id="savingDetail"><thead><tr><th>접수일자</th><th>기종</th><th>번호</th><th>정비 구분</th><th>작업 내용</th><th>예상(원)</th><th>결산(원)</th></tr></thead><tbody></tbody></table></div>
             </div>
         </div>
     </div>
@@ -6095,8 +6095,8 @@ const AUTH = (function () {
                 : '<tr><td colspan="3" style="color:#94a3b8;">체크된 원가절감 건이 없습니다.</td></tr>';
             const det = rows.slice().sort((a, b) => String(b['접수일자']).localeCompare(String(a['접수일자']))).slice(0, 100);
             document.querySelector('#savingDetail tbody').innerHTML = det.length
-                ? det.map(r => '<tr><td>' + escapeHtml(String(r['접수일자'] || '').substring(0, 10)) + '</td><td>' + escapeHtml((r['장비 구분'] || '') + ' ' + (r['장비번호'] || '')) + '</td><td>' + escapeHtml(r['정비 구분'] || '') + '</td><td style="text-align:left;">' + escapeHtml(String(r['문제점'] || '')) + '</td><td>' + Math.round(costOf(r)).toLocaleString() + '</td><td>' + (settledOf(r) === null ? '<span style="color:#94a3b8;">대기</span>' : Math.round(settledOf(r)).toLocaleString()) + '</td></tr>').join('') + (rows.length > 100 ? '<tr><td colspan="6" style="color:#94a3b8;">최근 100건만 표시합니다. (집계는 전체 ' + rows.length + '건)</td></tr>' : '')
-                : '<tr><td colspan="6" style="color:#94a3b8;">-</td></tr>';
+                ? det.map(r => '<tr><td>' + escapeHtml(String(r['접수일자'] || '').substring(0, 10)) + '</td><td>' + escapeHtml(r['장비 구분'] || '') + '</td><td>' + escapeHtml(String(r['장비번호'] || '')) + '</td><td>' + escapeHtml(r['정비 구분'] || '') + '</td><td style="text-align:left;">' + escapeHtml(String(r['문제점'] || '')) + '</td><td>' + Math.round(costOf(r)).toLocaleString() + '</td><td>' + (settledOf(r) === null ? '<span style="color:#94a3b8;">대기</span>' : Math.round(settledOf(r)).toLocaleString()) + '</td></tr>').join('') + (rows.length > 100 ? '<tr><td colspan="7" style="color:#94a3b8;">최근 100건만 표시합니다. (집계는 전체 ' + rows.length + '건)</td></tr>' : '')
+                : '<tr><td colspan="7" style="color:#94a3b8;">-</td></tr>';
         }
 
         function updateCharts(data) {
