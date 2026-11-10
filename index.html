@@ -818,6 +818,9 @@
         /* ============ 공통 모바일 반응형 / 좌측 메뉴 토글 ============ */
         /* 버튼을 사이드바(필터/메뉴) 컬럼의 맨 위에 자연스럽게 배치해, 별도 공간을 차지하지 않도록 함 */
         .sidebar-col { display: flex; flex-direction: column; align-items: stretch; flex-shrink: 0; }
+        /* PC: 사이드바 래퍼 안에서 패널이 화면 높이만큼만 차지하고 그 안에서 스크롤되도록 (래퍼 추가 후 스크롤이 막히던 문제) */
+        .sidebar-col { min-height: 0; overflow: hidden; }
+        .sidebar-col > #dash-sidebar, .sidebar-col > #input-sidebar, .sidebar-col > #daily-sidebar { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
         .mobile-sidebar-toggle {
             display: inline-flex; align-items: center; gap: 6px; width: fit-content;
             margin: 12px 0 8px 15px; min-height: 30px; padding: 6px 11px; border: 0; border-radius: 15px;
