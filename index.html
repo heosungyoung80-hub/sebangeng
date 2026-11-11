@@ -1235,7 +1235,7 @@ const AUTH = (function () {
     let session = null;
     let parsed = [];
     let branchList = FALLBACK;
-    const SETTINGS_MASTER_ONLY = true;   // true: 설정 수정은 MASTER 관리자만 (체크박스 방식으로 바꿀 때 false)
+    const SETTINGS_MASTER_ONLY = false;  // true: 설정 수정은 MASTER 관리자만 (체크박스 방식으로 바꿀 때 false)
     let viewing = null;      // MASTER 가 지사 화면을 보고 있을 때의 지사코드
     const $ = id => document.getElementById(id);
 
