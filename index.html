@@ -1752,6 +1752,7 @@ const AUTH = (function () {
             const res = await fetch(url, { method: 'POST', body: JSON.stringify({ branchCode: code, branchName: name, rows: rows.slice(i, i + SIZE) }) });
             if (!res.ok) throw new Error('서버 응답 오류 (HTTP ' + res.status + ')');
             const r = await res.json();
+            if (r && r.ok === false && r.result === undefined) throw new Error('주소가 정비 데이터(RAWDATA) 서버가 아닌 다른 서버(로그인 서버 등)로 설정돼 있는 것 같습니다. 설정 > 연동 설정의 "데이터 입력 / 통합 대시보드용 시트 주소"를 지우거나 [기본값으로 초기화] 후 새로고침해 주세요. (서버 응답: ' + (r.message || '') + ')');
             if (!r || r.result !== 'success') throw new Error((r && r.message) || '저장 실패');
             inserted += r.inserted || 0; skipped += r.skipped || 0;
         }
