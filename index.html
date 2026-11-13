@@ -8149,7 +8149,7 @@ ${completePhotoThumbsHtml(item)}
                 <h3 style="margin-top:0; color:#16232E;">🔧 [${escapeHtml(item.equipType || '-')}] ${escapeHtml(item.equipNum || '-')} 수리 요청서</h3>
                 <div style="display:flex; gap:6px; flex-wrap:wrap; justify-content:flex-end; align-items:center;">
                     <button class="btn" style="background:#2ecc71; color:#fff; font-size:12px;" onclick="printRepairForm('${item.id}')">🖨 인쇄</button>
-                    ${(donePhotoOn(item) && hasCompletePhotos(item)) ? `<button class="btn" style="background:#0f6e56; color:#fff; font-size:12px; font-weight:700;" onclick="printDonePhotos('${item.id}')">📸 완료 사진 출력</button>` : ''}
+                    ${(donePhotoOn(item) && hasCompletePhotos(item)) ? `<button class="btn" style="background:#0f6e56; color:#fff; font-size:12px; font-weight:700;" onclick="printDonePhotos('${item.id}')">📄 수리 완료 보고서 출력</button>` : ''}
                     ${status !== '완료' ? `<button class="btn" style="background:#fff; border:1px solid #2e75b6; color:#2e75b6; font-size:12px; font-weight:700;" onclick="openRepairEditModal('${item.id}')">✏ 접수 정보 수정</button>
                     <button class="btn" style="background:#fff; border:1px solid #c0392b; color:#c0392b; font-size:12px; font-weight:700;" onclick="openRepairDeleteModal('${item.id}')">🗑 삭제</button>` : ''}
                     <button class="btn" style="background:#fff; border:1px solid #ccc; color:#555; font-size:12px;" onclick="openRepairHistoryModal('${item.id}')">📜 이력${Number(item.editCount) > 0 ? ' (' + Number(item.editCount) + ')' : ''}</button>
@@ -8988,7 +8988,7 @@ ${completePhotoThumbsHtml(item)}
         const w = window.open('', '_blank', 'width=900,height=1100');
         if (!w) { alert('팝업이 차단되었습니다. 팝업 차단을 해제한 뒤 다시 시도해 주세요.'); return; }
         w.document.open();
-        w.document.write('<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8"><title>사진을 불러오는 중...</title></head><body style="font-family:sans-serif;padding:40px;color:#555;">📸 완료 사진을 불러오는 중입니다... (사진 ' + shots.length + '장)</body></html>');
+        w.document.write('<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8"><title>사진을 불러오는 중...</title></head><body style="font-family:sans-serif;padding:40px;color:#555;">📄 수리 완료 보고서를 불러오는 중입니다... (사진 ' + shots.length + '장)</body></html>');
         w.document.close();
         let failed = 0;
         const imgs = await Promise.all(shots.map(async x => { try { return await loadRepairPhoto(x.fileId, false); } catch (e) { failed++; return ''; } }));
@@ -8999,7 +8999,7 @@ ${completePhotoThumbsHtml(item)}
         const cols = n === 1 ? 1 : 2;
         const boxH = n === 1 ? 380 : (n === 2 ? 280 : 270);
         const cells = shots.map((x, i) => `<div style="break-inside:avoid;"><div class="box" style="height:${boxH}px;">${imgs[i] ? `<img src="${imgs[i]}" alt="">` : '<span style="color:#c0392b;font-size:12px;">사진을 불러오지 못했습니다</span>'}</div><div class="cap">${['①', '②', '③', '④'][i] || ''} ${escapeHtml(x.sl.label)}</div></div>`).join('');
-        const html = `<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8"><title>수리 완료 사진 - ${escapeHtml(rn)}</title>
+        const html = `<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8"><title>수리 완료 보고서 - ${escapeHtml(rn)}</title>
         <style>
             body { font-family: 'Malgun Gothic', sans-serif; padding: 16px; color:#111; }
             table { width:100%; border-collapse: collapse; margin-bottom: 12px; }
@@ -9018,7 +9018,7 @@ ${completePhotoThumbsHtml(item)}
                 <div class="no-print"><button onclick="window.print()" style="padding:6px 14px;">인쇄하기</button></div>
                 <span style="font-size:11px; color:#666;">출력일 ${todayStr}</span>
             </div>
-            <div class="ttl">수 리 완 료 사 진</div>
+            <div class="ttl">수 리 완 료 보 고 서</div>
             <table>
                 <tr><td class="label">접수번호</td><td colspan="3" style="font-weight:800; font-size:14px;">${escapeHtml(rn)}</td></tr>
                 <tr><td class="label">장비명/장비번호</td><td>${escapeHtml(equip)}</td><td class="label">정비구분</td><td>${escapeHtml(item.maintType || '-')}</td></tr>
@@ -9027,9 +9027,9 @@ ${completePhotoThumbsHtml(item)}
                 <tr><td class="label">수리 내용</td><td colspan="3" style="height:40px; white-space:pre-wrap;">${escapeHtml(item.completeNote || item.repairPlan || '')}</td></tr>
                 <tr><td class="label">작성자</td><td>${escapeHtml((item.requesterDept || '') + ' / ' + (item.requesterName || ''))}</td><td class="label">담당자</td><td>${escapeHtml((item.reviewerDept || '') + ' / ' + (item.reviewerName || ''))}</td></tr>
             </table>
-            <div style="font-size:13px; font-weight:800; margin:4px 0 8px;">📸 완료 사진</div>
+            <div style="font-size:13px; font-weight:800; margin:4px 0 8px;">작업 사진</div>
             <div class="grid">${cells}</div>
-            <div class="foot">${escapeHtml(rn)} · ${escapeHtml(equip)} · 수리 완료 사진</div>
+            <div class="foot">${escapeHtml(rn)} · ${escapeHtml(equip)} · 수리 완료 보고서</div>
         </body></html>`;
         w.document.open(); w.document.write(html); w.document.close();
         if (failed) showToast('사진 ' + failed + '장을 불러오지 못했습니다. 수리요청 Apps Script가 새 버전으로 배포되었는지 확인해 주세요.', true);
